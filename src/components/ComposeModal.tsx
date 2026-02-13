@@ -29,6 +29,7 @@ export interface ComposeModalProps {
   onClose: () => void;
   replyTo?: {
     id: string;
+    nylas_id: string;
     from_name: string;
     from_address: string;
     subject: string;
@@ -36,6 +37,7 @@ export interface ComposeModalProps {
     body?: string;
     received_at: string;
   };
+  initialCc?: string;
 }
 
 const TONES: { value: DraftTone; label: string }[] = [
@@ -46,7 +48,7 @@ const TONES: { value: DraftTone; label: string }[] = [
   { value: "concise", label: "Concise" },
 ];
 
-export default function ComposeModal({ open, onClose, replyTo }: ComposeModalProps) {
+export default function ComposeModal({ open, onClose, replyTo, initialCc }: ComposeModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -90,12 +92,12 @@ export default function ComposeModal({ open, onClose, replyTo }: ComposeModalPro
       setSubject("");
       setBody("");
     }
-    setCc("");
+    setCc(initialCc ?? "");
     setBcc("");
-    setShowCcBcc(false);
+    setShowCcBcc(!!initialCc);
     setShowAiPanel(false);
     setAiContext("");
-  }, [open, replyTo]);
+  }, [open, replyTo, initialCc]);
 
   const parseRecipients = (input: string) =>
     input
@@ -129,7 +131,7 @@ export default function ComposeModal({ open, onClose, replyTo }: ComposeModalPro
         bcc: bcc ? parseRecipients(bcc) : undefined,
         subject,
         body: body || "<p></p>",
-        reply_to_message_id: replyTo?.id,
+        reply_to_message_id: replyTo?.nylas_id,
       });
       toast({ title: "Email sent successfully" });
       onClose();
