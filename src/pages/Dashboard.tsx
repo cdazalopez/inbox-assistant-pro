@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
+import { useAlertPreferences } from "@/hooks/useAlertPreferences";
 import { getOrAnalyze } from "@/services/aiAnalysis";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,6 +73,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { prefs: alertPrefs } = useAlertPreferences();
+  const toastQueueRef = useRef<string[]>([]);
 
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
@@ -81,6 +84,56 @@ export default function Dashboard() {
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
   const [remainingUnanalyzed, setRemainingUnanalyzed] = useState<number>(0);
+
+  const notifyUrgentEmails = useCallback(
+    (newEntries: Record<string, EmailAnalysis>, emailsLookup: Email[]) => {
+      const emailMap = new Map(emailsLookup.map((e) => [e.id, e]));
+      let shown = 0;
+      const MAX_TOASTS = 5;
+
+      for (const [emailId, analysis] of Object.entries(newEntries)) {
+        if (shown >= MAX_TOASTS) break;
+        if (toastQueueRef.current.includes(emailId)) continue;
+
+        const email = emailMap.get(emailId);
+        if (!email) continue;
+
+        const hasLegalThreat = analysis.risk_flags?.includes("legal_threat");
+        const isCritical = analysis.urgency >= 5 || hasLegalThreat;
+        const isHigh = analysis.urgency >= alertPrefs.urgencyThreshold;
+        const hasRiskFlags = (analysis.risk_flags?.length ?? 0) > 0;
+
+        if (isCritical && (alertPrefs.showUrgentToasts || alertPrefs.showRiskFlagToasts)) {
+          const flagDesc = analysis.risk_flags?.[0]?.replace(/_/g, " ") ?? "critical";
+          toast({
+            title: `⚠️ URGENT: ${email.subject}`,
+            description: flagDesc,
+            variant: "destructive",
+            duration: 8000,
+          });
+          toastQueueRef.current.push(emailId);
+          shown++;
+        } else if (isHigh && alertPrefs.showUrgentToasts) {
+          toast({
+            title: `🔔 High Priority: ${email.subject}`,
+            duration: 8000,
+          });
+          toastQueueRef.current.push(emailId);
+          shown++;
+        } else if (hasRiskFlags && alertPrefs.showRiskFlagToasts) {
+          const flagDesc = analysis.risk_flags?.[0]?.replace(/_/g, " ") ?? "risk detected";
+          toast({
+            title: `🔔 ${email.subject}`,
+            description: flagDesc,
+            duration: 8000,
+          });
+          toastQueueRef.current.push(emailId);
+          shown++;
+        }
+      }
+    },
+    [alertPrefs, toast]
+  );
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -199,6 +252,7 @@ export default function Dashboard() {
         results.forEach((r, idx) => {
           if (r.status === "fulfilled") newEntries[batch[idx].id] = r.value;
         });
+        notifyUrgentEmails(newEntries, toAnalyze);
         setAnalysesMap((prev) => ({ ...(prev ?? {}), ...newEntries }));
         setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, toAnalyze.length) }));
       }
@@ -262,6 +316,7 @@ export default function Dashboard() {
         results.forEach((r, idx) => {
           if (r.status === "fulfilled") newEntries[batch[idx].id] = r.value;
         });
+        notifyUrgentEmails(newEntries, emails);
         setAnalysesMap((prev) => ({ ...(prev ?? {}), ...newEntries }));
         setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, emails.length) }));
       }
