@@ -28,6 +28,62 @@ import {
 } from "date-fns";
 
 const HOURS = Array.from({ length: 11 }, (_, i) => i + 8); // 8AM - 6PM
+
+function getDemoEvents(): CalendarEvent[] {
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+
+  const makeEvent = (
+    dayOffset: number,
+    startHour: number,
+    startMin: number,
+    durationMin: number,
+    title: string,
+    opts: Partial<CalendarEvent> = {}
+  ): CalendarEvent => {
+    const day = new Date(weekStart);
+    day.setDate(day.getDate() + dayOffset);
+    const start = new Date(day);
+    start.setHours(startHour, startMin, 0, 0);
+    const end = new Date(start.getTime() + durationMin * 60000);
+    return {
+      id: `demo-${dayOffset}-${startHour}`,
+      title,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      all_day: false,
+      ...opts,
+    };
+  };
+
+  return [
+    makeEvent(0, 9, 0, 60, "Team Standup", {
+      location: "Zoom",
+      participants: [{ name: "Alice", email: "alice@co.com" }, { name: "Bob", email: "bob@co.com" }],
+    }),
+    makeEvent(0, 14, 0, 30, "1:1 with Manager", { location: "Room 3B" }),
+    makeEvent(1, 10, 0, 90, "Client Review – Acme Corp", {
+      location: "Google Meet",
+      description: "Q1 deliverables review with the Acme team.",
+      participants: [{ name: "Sarah Chen", email: "sarah@acme.com" }],
+    }),
+    makeEvent(2, 11, 0, 60, "Product Demo", { location: "Main Conference Room" }),
+    makeEvent(2, 15, 30, 45, "Design Sync", { location: "Figma" }),
+    makeEvent(3, 9, 30, 60, "Sprint Planning", {
+      location: "Zoom",
+      participants: [
+        { name: "Dev Team", email: "dev@co.com" },
+        { name: "PM", email: "pm@co.com" },
+      ],
+    }),
+    makeEvent(3, 13, 0, 30, "Lunch & Learn: AI Tools"),
+    makeEvent(4, 10, 0, 120, "Quarterly Review", {
+      location: "Board Room",
+      description: "All-hands quarterly performance review.",
+    }),
+    makeEvent(4, 16, 0, 60, "Happy Hour 🍻", { location: "Rooftop Lounge" }),
+  ];
+}
 const HOUR_HEIGHT = 60; // px per hour
 
 function getEventPosition(event: CalendarEvent) {
@@ -56,9 +112,11 @@ export default function CalendarPage() {
     setEvents(null);
     try {
       const data = await awsApi.getCalendarEvents(user.id, 14, 7);
-      setEvents(data.events ?? []);
+      const apiEvents = data.events ?? [];
+      // Use demo events as fallback when no real events exist
+      setEvents(apiEvents.length > 0 ? apiEvents : getDemoEvents());
     } catch {
-      setEvents([]);
+      setEvents(getDemoEvents());
     }
   }, [user?.id]);
 
