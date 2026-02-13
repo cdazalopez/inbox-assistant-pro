@@ -31,6 +31,7 @@ import {
   ChevronRight,
   X,
   Loader2,
+  Brain,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -80,6 +81,8 @@ export default function Inbox() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
 
   const limit = 25;
 
@@ -231,6 +234,47 @@ export default function Inbox() {
     return emails.filter((e) => analysesMap[e.id]?.category === categoryFilter);
   }, [emails, categoryFilter, analysesMap]);
 
+  const handleBatchAnalyze = useCallback(async () => {
+    if (!user?.id || batchAnalyzing) return;
+    const unanalyzed = emails.filter((e) => !analysesMap[e.id]);
+    if (unanalyzed.length === 0) {
+      toast({ title: "All visible emails already analyzed" });
+      return;
+    }
+    setBatchAnalyzing(true);
+    setBatchProgress({ done: 0, total: unanalyzed.length });
+
+    // Process in small batches of 3 to avoid rate limits
+    const batchSize = 3;
+    for (let i = 0; i < unanalyzed.length; i += batchSize) {
+      const batch = unanalyzed.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        batch.map((email) =>
+          getOrAnalyze(email.id, {
+            id: email.id,
+            from_name: email.from_name,
+            from_address: email.from_address,
+            subject: email.subject,
+            snippet: email.snippet,
+            user_id: user.id,
+          })
+        )
+      );
+      // Update map with successful results
+      const newEntries: Record<string, EmailAnalysis> = {};
+      results.forEach((r, idx) => {
+        if (r.status === "fulfilled") {
+          newEntries[batch[idx].id] = r.value;
+        }
+      });
+      setAnalysesMap((prev) => ({ ...prev, ...newEntries }));
+      setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, unanalyzed.length) }));
+    }
+
+    setBatchAnalyzing(false);
+    toast({ title: `Analyzed ${unanalyzed.length} email${unanalyzed.length !== 1 ? "s" : ""}` });
+  }, [user?.id, emails, analysesMap, batchAnalyzing, toast]);
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       {/* Header */}
@@ -252,6 +296,19 @@ export default function Inbox() {
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
           </div>
+          <Button variant="outline" size="sm" onClick={handleBatchAnalyze} disabled={batchAnalyzing || loading}>
+            {batchAnalyzing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="hidden sm:inline">{batchProgress.done}/{batchProgress.total}</span>
+              </>
+            ) : (
+              <>
+                <Brain className="h-4 w-4" />
+                <span className="hidden sm:inline">Analyze All</span>
+              </>
+            )}
+          </Button>
           <Button variant="outline" size="sm" onClick={syncAndLoad} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Sync</span>
