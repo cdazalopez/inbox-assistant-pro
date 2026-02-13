@@ -1,14 +1,17 @@
 export interface Email {
   id: string;
+  nylas_id: string;
   subject: string;
   from_name: string;
   from_address: string;
+  to_addresses: { name?: string; email: string }[];
   snippet: string;
   received_at: string;
   is_read: boolean;
   is_starred: boolean;
   has_attachments: boolean;
   labels?: string[];
+  account_email?: string;
 }
 
 export interface EmailsResponse {

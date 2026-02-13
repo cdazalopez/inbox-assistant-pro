@@ -39,6 +39,7 @@ import {
   Brain,
   PenSquare,
   Reply,
+  ReplyAll,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -104,6 +105,7 @@ export default function Inbox() {
   // Compose modal state
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeReplyTo, setComposeReplyTo] = useState<any>(null);
+  const [composeInitialCc, setComposeInitialCc] = useState("");
 
   const limit = 25;
 
@@ -313,7 +315,7 @@ export default function Inbox() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => { setComposeReplyTo(null); setComposeOpen(true); }}>
+          <Button size="sm" onClick={() => { setComposeReplyTo(null); setComposeInitialCc(""); setComposeOpen(true); }}>
             <PenSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Compose</span>
           </Button>
@@ -510,8 +512,10 @@ export default function Inbox() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => {
+                setComposeInitialCc("");
                 setComposeReplyTo({
                   id: selectedEmail.id,
+                  nylas_id: selectedEmail.nylas_id,
                   from_name: selectedEmail.from_name,
                   from_address: selectedEmail.from_address,
                   subject: selectedEmail.subject,
@@ -524,6 +528,29 @@ export default function Inbox() {
                 <Reply className="h-4 w-4" />
                 Reply
               </Button>
+              {(selectedEmail.to_addresses?.length > 1 || selectedEmail.to_addresses?.some(r => r.email !== selectedEmail.from_address)) && (
+                <Button variant="outline" size="sm" onClick={() => {
+                  const userEmail = selectedEmail.account_email || user?.email || "";
+                  const ccRecipients = (selectedEmail.to_addresses ?? [])
+                    .filter(r => r.email !== selectedEmail.from_address && r.email !== userEmail)
+                    .map(r => r.email);
+                  setComposeInitialCc(ccRecipients.join(", "));
+                  setComposeReplyTo({
+                    id: selectedEmail.id,
+                    nylas_id: selectedEmail.nylas_id,
+                    from_name: selectedEmail.from_name,
+                    from_address: selectedEmail.from_address,
+                    subject: selectedEmail.subject,
+                    snippet: selectedEmail.snippet,
+                    body: emailBody ?? undefined,
+                    received_at: selectedEmail.received_at,
+                  });
+                  setComposeOpen(true);
+                }}>
+                  <ReplyAll className="h-4 w-4" />
+                  Reply All
+                </Button>
+              )}
               <div className="flex-1" />
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
                 <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
@@ -615,6 +642,7 @@ export default function Inbox() {
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
         replyTo={composeReplyTo ?? undefined}
+        initialCc={composeInitialCc}
       />
     </div>
   );
