@@ -26,9 +26,9 @@ interface Email {
   id: string;
   subject: string;
   from_name: string;
-  from_email: string;
+  from_address: string;
   snippet: string;
-  date: string;
+  received_at: string;
   is_read: boolean;
   is_starred: boolean;
   has_attachments: boolean;
@@ -300,7 +300,7 @@ export default function Inbox() {
                           !email.is_read ? "font-semibold text-foreground" : "text-foreground/80"
                         }`}
                       >
-                        {email.from_name || email.from_email}
+                        {email.from_name || email.from_address}
                       </span>
                       {email.has_attachments && (
                         <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
@@ -316,7 +316,7 @@ export default function Inbox() {
                     <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
                   </div>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatRelativeDate(email.date)}
+                    {formatRelativeDate(email.received_at)}
                   </span>
                 </button>
               ))}
@@ -396,16 +396,16 @@ export default function Inbox() {
               </h2>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary">
-                  {(selectedEmail.from_name || selectedEmail.from_email || "?")[0].toUpperCase()}
+                  {(selectedEmail.from_name || selectedEmail.from_address || "?")[0].toUpperCase()}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    {selectedEmail.from_name || selectedEmail.from_email}
+                    {selectedEmail.from_name || selectedEmail.from_address}
                   </p>
-                  <p className="text-xs text-muted-foreground">{selectedEmail.from_email}</p>
+                  <p className="text-xs text-muted-foreground">{selectedEmail.from_address}</p>
                 </div>
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {formatFullDate(selectedEmail.date)}
+                  {formatFullDate(selectedEmail.received_at)}
                 </span>
               </div>
               {loadingBody ? (
