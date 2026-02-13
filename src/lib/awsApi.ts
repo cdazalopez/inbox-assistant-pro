@@ -89,4 +89,30 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to send email');
     return res.json();
   },
+
+  getBriefings: async (userId: string, date?: string) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (date) params.append('date', date);
+    const res = await fetch(`${API_BASE}/briefings?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch briefings');
+    const data = await res.json();
+    return data.briefings;
+  },
+
+  storeBriefing: async (params: {
+    user_id: string;
+    date: string;
+    type: string;
+    content: any;
+    urgent_count: number;
+    pending_count: number;
+  }) => {
+    const res = await fetch(`${API_BASE}/briefings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to store briefing');
+    return res.json();
+  },
 };
