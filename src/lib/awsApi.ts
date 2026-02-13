@@ -45,4 +45,9 @@ export const awsApi = {
     });
     return res.json();
   },
+
+  getEmail: async (emailId: string) => {
+    const res = await fetch(`${API_BASE}/email?email_id=${emailId}`);
+    return res.json();
+  },
 };
