@@ -22,7 +22,7 @@ export interface CalendarResponse {
   range?: { start: string; end: string };
 }
 
-const MEETING_KEYWORDS = /\b(meeting|call|appointment|schedule|zoom|teams|webex|hangout|standup|sync|check-in|demo|interview|review|1:1|one-on-one)\b/i;
+const MEETING_KEYWORDS = /\b(meet|meeting|call|appointment|schedule|zoom|teams|webex|hangout|standup|sync|check-in|demo|interview|review|1:1|one-on-one)\b/i;
 
 export function isMeetingEmail(subject: string, category?: string): boolean {
   if (category === "meeting" || category === "scheduling") return true;
