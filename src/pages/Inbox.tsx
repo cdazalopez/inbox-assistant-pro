@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { Input } from "@/components/ui/input";
@@ -42,19 +43,28 @@ interface EmailsResponse {
   total_pages: number;
 }
 
-function formatRelativeDate(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+function safeDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+}
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return "Yesterday";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function formatRelativeDate(dateStr: string | null | undefined): string {
+  const date = safeDate(dateStr);
+  if (!date) return "";
+  const now = new Date();
+  const diffMins = differenceInMinutes(now, date);
+  if (diffMins < 60) return `${Math.max(diffMins, 0)}m ago`;
+  const diffHrs = differenceInHours(now, date);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  if (differenceInDays(now, date) < 7) return format(date, "EEE");
+  return format(date, "MMM d");
+}
+
+function formatFullDate(dateStr: string | null | undefined): string {
+  const date = safeDate(dateStr);
+  if (!date) return "";
+  return format(date, "MMMM d, yyyy 'at' h:mm a");
 }
 
 export default function Inbox() {
@@ -395,7 +405,7 @@ export default function Inbox() {
                   <p className="text-xs text-muted-foreground">{selectedEmail.from_email}</p>
                 </div>
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {new Date(selectedEmail.date).toLocaleString()}
+                  {formatFullDate(selectedEmail.date)}
                 </span>
               </div>
               {loadingBody ? (
