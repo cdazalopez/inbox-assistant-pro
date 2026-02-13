@@ -36,11 +36,13 @@ export async function analyzeEmail(email: EmailInput): Promise<EmailAnalysis> {
   return data as EmailAnalysis;
 }
 
-export async function getOrAnalyze(emailId: string, email: EmailInput): Promise<EmailAnalysis> {
-  // Check for existing analysis
-  const existing = await awsApi.getAnalysis(emailId);
-  if (existing && !existing.error && existing.category) {
-    return existing as EmailAnalysis;
+export async function getOrAnalyze(emailId: string, email: EmailInput, forceRefresh = false): Promise<EmailAnalysis> {
+  // Check for existing analysis (unless force refresh)
+  if (!forceRefresh) {
+    const existing = await awsApi.getAnalysis(emailId);
+    if (existing && !existing.error && existing.category) {
+      return existing as EmailAnalysis;
+    }
   }
 
   // Run AI analysis

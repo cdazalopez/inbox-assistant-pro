@@ -80,6 +80,7 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
+  const [remainingUnanalyzed, setRemainingUnanalyzed] = useState<number>(0);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -111,6 +112,24 @@ export default function Dashboard() {
     fetchData();
   }, [fetchData]);
 
+  // Auto-analyze on first load if there are unanalyzed emails
+  useEffect(() => {
+    if (recentEmails === null || analysesMap === null) return;
+    
+    const data = async () => {
+      if (!user?.id) return;
+      const allEmails = await awsApi.getEmails(user.id, 1, 100, "inbox");
+      const emails: Email[] = allEmails.emails ?? [];
+      const unanalyzedCount = emails.filter(e => !analysesMap[e.id]).length;
+      
+      if (unanalyzedCount > 0) {
+        autoAnalyze(20);
+      }
+    };
+    
+    data();
+  }, []);
+
   const requiresResponseCount = useMemo(() => {
     if (!analysesMap) return null;
     return Object.values(analysesMap).filter((a) => a.requires_response).length;
@@ -136,39 +155,33 @@ export default function Dashboard() {
     return Math.max(...categoryCounts.map(([, c]) => c), 1);
   }, [categoryCounts]);
 
-  const handleSync = async () => {
-    if (!user?.id) return;
-    setSyncing(true);
-    try {
-      const res = await awsApi.syncEmails(user.id);
-      const count = res?.new_emails ?? res?.synced ?? 0;
-      toast({ title: `Synced ${count} email${count !== 1 ? "s" : ""}` });
-      fetchData();
-    } catch {
-      toast({ title: "Sync failed", variant: "destructive" });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleBatchAnalyze = async () => {
+  const autoAnalyze = useCallback(async (cap?: number) => {
     if (!user?.id || batchAnalyzing) return;
-    // Get all emails for analysis
     setBatchAnalyzing(true);
     try {
-      const data = await awsApi.getEmails(user.id, 1, 50, "inbox");
+      const data = await awsApi.getEmails(user.id, 1, 100, "inbox");
       const emails: Email[] = data.emails ?? [];
       const existing = analysesMap ?? {};
       const unanalyzed = emails.filter((e) => !existing[e.id]);
+      
       if (unanalyzed.length === 0) {
-        toast({ title: "All emails already analyzed" });
         setBatchAnalyzing(false);
+        setRemainingUnanalyzed(0);
         return;
       }
-      setBatchProgress({ done: 0, total: unanalyzed.length });
+
+      const toAnalyze = cap ? unanalyzed.slice(0, cap) : unanalyzed;
+      const remaining = Math.max(0, unanalyzed.length - (cap ?? unanalyzed.length));
+      setRemainingUnanalyzed(remaining);
+
+      setBatchProgress({ done: 0, total: toAnalyze.length });
       const batchSize = 3;
-      for (let i = 0; i < unanalyzed.length; i += batchSize) {
-        const batch = unanalyzed.slice(i, i + batchSize);
+      const delayMs = 500;
+
+      for (let i = 0; i < toAnalyze.length; i += batchSize) {
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+        
+        const batch = toAnalyze.slice(i, i + batchSize);
         const results = await Promise.allSettled(
           batch.map((email) =>
             getOrAnalyze(email.id, {
@@ -181,17 +194,82 @@ export default function Dashboard() {
             })
           )
         );
+        
         const newEntries: Record<string, EmailAnalysis> = {};
         results.forEach((r, idx) => {
           if (r.status === "fulfilled") newEntries[batch[idx].id] = r.value;
         });
         setAnalysesMap((prev) => ({ ...(prev ?? {}), ...newEntries }));
-        setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, unanalyzed.length) }));
+        setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, toAnalyze.length) }));
       }
-      toast({ title: `Analyzed ${unanalyzed.length} email${unanalyzed.length !== 1 ? "s" : ""}` });
+
+      toast({ title: `Analyzed ${toAnalyze.length} email${toAnalyze.length !== 1 ? "s" : ""}` });
       fetchData();
     } catch {
       toast({ title: "Analysis failed", variant: "destructive" });
+    } finally {
+      setBatchAnalyzing(false);
+    }
+  }, [user?.id, batchAnalyzing, analysesMap]);
+
+  const handleSync = async () => {
+    if (!user?.id) return;
+    setSyncing(true);
+    try {
+      const res = await awsApi.syncEmails(user.id);
+      const count = res?.new_emails ?? res?.synced ?? 0;
+      toast({ title: `Synced ${count} email${count !== 1 ? "s" : ""}` });
+      fetchData();
+      // Auto-analyze new emails after sync
+      await new Promise(resolve => setTimeout(resolve, 500));
+      autoAnalyze();
+    } catch {
+      toast({ title: "Sync failed", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleReanalyzeAll = async () => {
+    if (!user?.id || batchAnalyzing) return;
+    setBatchAnalyzing(true);
+    try {
+      const data = await awsApi.getEmails(user.id, 1, 100, "inbox");
+      const emails: Email[] = data.emails ?? [];
+      
+      setBatchProgress({ done: 0, total: emails.length });
+      const batchSize = 3;
+      const delayMs = 500;
+
+      for (let i = 0; i < emails.length; i += batchSize) {
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+        
+        const batch = emails.slice(i, i + batchSize);
+        const results = await Promise.allSettled(
+          batch.map((email) =>
+            getOrAnalyze(email.id, {
+              id: email.id,
+              from_name: email.from_name,
+              from_address: email.from_address,
+              subject: email.subject,
+              snippet: email.snippet,
+              user_id: user.id,
+            }, true) // forceRefresh=true to skip cache
+          )
+        );
+        
+        const newEntries: Record<string, EmailAnalysis> = {};
+        results.forEach((r, idx) => {
+          if (r.status === "fulfilled") newEntries[batch[idx].id] = r.value;
+        });
+        setAnalysesMap((prev) => ({ ...(prev ?? {}), ...newEntries }));
+        setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, emails.length) }));
+      }
+
+      toast({ title: `Re-analyzed ${emails.length} email${emails.length !== 1 ? "s" : ""}` });
+      fetchData();
+    } catch {
+      toast({ title: "Re-analysis failed", variant: "destructive" });
     } finally {
       setBatchAnalyzing(false);
     }
@@ -367,7 +445,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 className="w-full justify-start gap-2"
-                onClick={handleBatchAnalyze}
+                onClick={handleReanalyzeAll}
                 disabled={batchAnalyzing}
               >
                 {batchAnalyzing ? (
@@ -378,10 +456,20 @@ export default function Dashboard() {
                 ) : (
                   <>
                     <Brain className="h-4 w-4" />
-                    Analyze All Emails
+                    Re-analyze All Emails
                   </>
                 )}
               </Button>
+              {remainingUnanalyzed > 0 && !batchAnalyzing && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                  onClick={() => autoAnalyze()}
+                >
+                  <Brain className="h-4 w-4" />
+                  Analyze Remaining {remainingUnanalyzed} Emails
+                </Button>
+              )}
               <Button
                 className="w-full justify-start gap-2"
                 onClick={() => navigate("/inbox")}
