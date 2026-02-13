@@ -4,6 +4,8 @@ import { awsApi } from "@/lib/awsApi";
 import { CalendarEvent } from "@/components/calendar/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import CreateEventModal from "@/components/calendar/CreateEventModal";
 import {
   ChevronLeft,
   ChevronRight,
@@ -100,9 +102,13 @@ function getEventPosition(event: CalendarEvent) {
 
 export default function CalendarPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createInitialDate, setCreateInitialDate] = useState<Date | undefined>();
+  const [createInitialHour, setCreateInitialHour] = useState<number | undefined>();
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
   const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
@@ -156,6 +162,26 @@ export default function CalendarPage() {
   function getEventColor(idx: number) {
     return eventColors[idx % eventColors.length];
   }
+
+  const handleSlotClick = (day: Date, hour: number) => {
+    setCreateInitialDate(day);
+    setCreateInitialHour(hour);
+    setCreateModalOpen(true);
+  };
+
+  const handleCreateEvent = async (data: {
+    title: string;
+    description?: string;
+    location?: string;
+    start_time: string;
+    end_time: string;
+    all_day?: boolean;
+  }) => {
+    if (!user?.id) return;
+    await awsApi.createCalendarEvent({ user_id: user.id, ...data });
+    toast({ title: "Event created ✅" });
+    fetchEvents();
+  };
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -246,7 +272,12 @@ export default function CalendarPage() {
             {days.map((day) => (
               <div key={day.toISOString()} className="relative border-r border-border last:border-r-0">
                 {HOURS.map((hour) => (
-                  <div key={hour} className="border-b border-border/50" style={{ height: HOUR_HEIGHT }} />
+                  <div
+                    key={hour}
+                    className="border-b border-border/50 cursor-pointer hover:bg-primary/5 transition-colors"
+                    style={{ height: HOUR_HEIGHT }}
+                    onClick={() => handleSlotClick(day, hour)}
+                  />
                 ))}
                 {/* Event blocks */}
                 {timedEvents(day).map((event, idx) => {
@@ -331,6 +362,15 @@ export default function CalendarPage() {
           </div>
         </div>
       )}
+
+      {/* Create Event Modal */}
+      <CreateEventModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSave={handleCreateEvent}
+        initialDate={createInitialDate}
+        initialHour={createInitialHour}
+      />
     </div>
   );
 }

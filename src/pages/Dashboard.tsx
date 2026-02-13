@@ -19,6 +19,8 @@ import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestion
 import SuggestionCard from "@/components/suggestions/SuggestionCard";
 import TasksFollowupsWidget from "@/components/tasks/TasksFollowupsWidget";
 import UpcomingMeetingsWidget from "@/components/calendar/UpcomingMeetingsWidget";
+import EventReminders from "@/components/calendar/EventReminders";
+import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCard";
 import {
   Mail,
   MailOpen,
@@ -367,6 +369,9 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {/* Event Reminders */}
+      <EventReminders />
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatsCard
@@ -474,6 +479,13 @@ export default function Dashboard() {
             suggestions={smartSuggestions}
             onAction={handleSuggestionAction}
           />
+          {/* AI Calendar Suggestions */}
+          {analysesMap && allEmails.length > 0 && (
+            <CalendarSuggestionsCard
+              analysesMap={analysesMap}
+              emailsMap={Object.fromEntries(allEmails.map((e) => [e.id, { subject: e.subject, snippet: e.snippet }]))}
+            />
+          )}
           {/* Tasks & Follow-ups Widget */}
           <TasksFollowupsWidget />
           {/* Upcoming Meetings Widget */}
