@@ -31,8 +31,15 @@ export default function Signup() {
 
     if (error) {
       toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      toast({ title: "Signup succeeded but auto-login failed", description: signInError.message, variant: "destructive" });
     } else {
-      toast({ title: "Check your email", description: "We sent you a confirmation link to verify your account." });
+      navigate("/dashboard");
     }
     setLoading(false);
   };
