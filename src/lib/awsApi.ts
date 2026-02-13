@@ -14,4 +14,15 @@ export const awsApi = {
     });
     return res.json();
   },
+
+  connectEmail: async (userId: string, provider: 'google' | 'microsoft') => {
+    const res = await fetch(`${API_BASE}/connect-email?user_id=${userId}&provider=${provider}`);
+    const data = await res.json();
+    return data;
+  },
+
+  getAccounts: async (userId: string) => {
+    const res = await fetch(`${API_BASE}/accounts?user_id=${userId}`);
+    return res.json();
+  },
 };
