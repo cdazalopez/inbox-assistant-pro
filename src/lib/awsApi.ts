@@ -50,4 +50,24 @@ export const awsApi = {
     const res = await fetch(`${API_BASE}/email?email_id=${emailId}`);
     return res.json();
   },
+
+  storeAnalysis: async (analysis: any) => {
+    const res = await fetch(`${API_BASE}/analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(analysis),
+    });
+    return res.json();
+  },
+
+  getAnalysis: async (emailId: string) => {
+    const res = await fetch(`${API_BASE}/analysis?email_id=${emailId}`);
+    if (res.status === 404) return null;
+    return res.json();
+  },
+
+  getAllAnalyses: async (userId: string) => {
+    const res = await fetch(`${API_BASE}/analysis?user_id=${userId}`);
+    return res.json();
+  },
 };
