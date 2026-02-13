@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { useAlertPreferences } from "@/hooks/useAlertPreferences";
 import { getOrAnalyze } from "@/services/aiAnalysis";
+import { generateBriefing, Briefing } from "@/services/briefingService";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,8 @@ import {
   Brain,
   Inbox,
   Loader2,
+  FileText,
+  Sparkles,
 } from "lucide-react";
 import {
   differenceInMinutes,
@@ -84,7 +87,8 @@ export default function Dashboard() {
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
   const [remainingUnanalyzed, setRemainingUnanalyzed] = useState<number>(0);
-
+  const [todayBriefing, setTodayBriefing] = useState<Briefing | null>(null);
+  const [briefingLoading, setBriefingLoading] = useState(false);
   const notifyUrgentEmails = useCallback(
     (newEntries: Record<string, EmailAnalysis>, emailsLookup: Email[]) => {
       const emailMap = new Map(emailsLookup.map((e) => [e.id, e]));
@@ -163,7 +167,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    // Fetch today's briefing
+    if (user?.id) {
+      const today = new Date().toISOString().split("T")[0];
+      awsApi.getBriefings(user.id, today).then((briefings) => {
+        if (briefings?.length > 0) setTodayBriefing(briefings[0]);
+      }).catch(() => {});
+    }
+  }, [fetchData, user?.id]);
 
   // Auto-analyze on first load if there are unanalyzed emails
   useEffect(() => {
@@ -478,6 +489,69 @@ export default function Dashboard() {
                     </div>
                   );
                 })
+              )}
+            </div>
+          </div>
+
+          {/* Today's Briefing Widget */}
+          <div className="rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+              <FileText className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">Today's Briefing</h2>
+            </div>
+            <div className="px-5 py-4">
+              {todayBriefing ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                    {todayBriefing.content?.summary || (typeof todayBriefing.content === 'string' ? JSON.parse(todayBriefing.content).summary : '')}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {todayBriefing.urgent_count > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        {todayBriefing.urgent_count} urgent
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => navigate("/briefings")}
+                  >
+                    View Full Briefing
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3 text-center">
+                  <p className="text-xs text-muted-foreground">No briefing yet</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2 text-xs"
+                    disabled={briefingLoading}
+                    onClick={async () => {
+                      if (!user?.id) return;
+                      setBriefingLoading(true);
+                      try {
+                        const b = await generateBriefing(user.id);
+                        setTodayBriefing(b);
+                        toast({ title: "Briefing generated" });
+                      } catch {
+                        toast({ title: "Failed to generate briefing", variant: "destructive" });
+                      } finally {
+                        setBriefingLoading(false);
+                      }
+                    }}
+                  >
+                    {briefingLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Generate
+                  </Button>
+                </div>
               )}
             </div>
           </div>

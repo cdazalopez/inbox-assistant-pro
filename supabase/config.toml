@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.generate-draft]
 verify_jwt = false
+
+[functions.generate-briefing]
+verify_jwt = false

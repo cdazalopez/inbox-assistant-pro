@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
+import Briefings from "./pages/Briefings";
 import Settings from "./pages/Settings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -55,7 +56,7 @@ const App = () => (
               path="/briefings"
               element={
                 <ProtectedRoute>
-                  <DashboardLayout><Placeholder /></DashboardLayout>
+                  <DashboardLayout><Briefings /></DashboardLayout>
                 </ProtectedRoute>
               }
             />
