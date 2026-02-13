@@ -10,7 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { User, Link2, Bell, Loader2 } from "lucide-react";
+import { useAlertPreferences } from "@/hooks/useAlertPreferences";
+import { User, Link2, Bell, Loader2, ShieldAlert } from "lucide-react";
 
 interface ConnectedAccount {
   id: string;
@@ -23,6 +24,7 @@ interface ConnectedAccount {
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { prefs, update } = useAlertPreferences();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
@@ -88,6 +90,12 @@ export default function Settings() {
       </svg>
     );
 
+  const thresholdOptions: { value: 3 | 4 | 5; label: string }[] = [
+    { value: 3, label: "3+ (Medium and above)" },
+    { value: 4, label: "4+ (High and above)" },
+    { value: 5, label: "5 only (Critical only)" },
+  ];
+
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Settings</h1>
@@ -127,7 +135,6 @@ export default function Settings() {
           <CardDescription>Connect your email accounts to start managing your inbox</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Connected accounts list */}
           {loadingAccounts ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -163,7 +170,6 @@ export default function Settings() {
             </div>
           ) : null}
 
-          {/* Connect buttons */}
           <div className="grid gap-4 sm:grid-cols-2">
             <Button
               variant="outline"
@@ -200,6 +206,60 @@ export default function Settings() {
               )}
               <span className="text-sm font-medium">Connect Outlook</span>
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Alert Preferences */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-primary" />
+            <CardTitle>Alert Preferences</CardTitle>
+          </div>
+          <CardDescription>Configure how urgent email alerts are displayed</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Toast notifications for urgent emails</Label>
+              <p className="text-xs text-muted-foreground">Show popup alerts for high urgency emails</p>
+            </div>
+            <Switch
+              checked={prefs.showUrgentToasts}
+              onCheckedChange={(v) => update({ showUrgentToasts: v })}
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Toast notifications for risk flags</Label>
+              <p className="text-xs text-muted-foreground">Show alerts for legal threats, payment issues, etc.</p>
+            </div>
+            <Switch
+              checked={prefs.showRiskFlagToasts}
+              onCheckedChange={(v) => update({ showRiskFlagToasts: v })}
+            />
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <Label>Alert urgency threshold</Label>
+            <p className="text-xs text-muted-foreground">Minimum urgency level to trigger alerts</p>
+            <div className="flex gap-2 pt-1">
+              {thresholdOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => update({ urgencyThreshold: opt.value })}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    prefs.urgencyThreshold === opt.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

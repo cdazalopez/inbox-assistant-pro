@@ -25,6 +25,8 @@ import {
   URGENCY_DOT_COLORS,
   getUrgencyLevel,
 } from "@/components/inbox/types";
+import RiskFlagBadges from "@/components/alerts/RiskFlagBadges";
+import UrgentBanner from "@/components/alerts/UrgentBanner";
 import {
   RefreshCw,
   Search,
@@ -306,8 +308,24 @@ export default function Inbox() {
     toast({ title: `Analyzed ${unanalyzed.length} email${unanalyzed.length !== 1 ? "s" : ""}` });
   }, [user?.id, emails, analysesMap, batchAnalyzing, toast]);
 
+  const unreadEmailIds = useMemo(
+    () => new Set(emails.filter((e) => !e.is_read).map((e) => e.id)),
+    [emails]
+  );
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+      {/* Urgent Banner */}
+      <UrgentBanner
+        analysesMap={analysesMap}
+        unreadEmailIds={unreadEmailIds}
+        onFilterUrgent={() => {
+          setCategoryFilter(null);
+          setFilter("unread");
+          setPage(1);
+        }}
+      />
+
       {/* Header */}
       <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -462,6 +480,9 @@ export default function Inbox() {
                           <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${catClass}`}>
                             {analysis!.category}
                           </span>
+                        )}
+                        {analysis?.risk_flags && analysis.risk_flags.length > 0 && (
+                          <RiskFlagBadges flags={analysis.risk_flags} size="sm" />
                         )}
                       </div>
                       <div className="flex items-center gap-1">
