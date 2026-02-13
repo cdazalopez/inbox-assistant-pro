@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
-import { generateDraft, type DraftTone } from "@/services/aiDraftService";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -14,15 +13,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  X,
   Send,
   Sparkles,
   Trash2,
   ChevronDown,
   ChevronUp,
   Loader2,
-  RefreshCw,
 } from "lucide-react";
+import RichTextToolbar from "@/components/compose/RichTextToolbar";
+import AIDraftPanel from "@/components/compose/AIDraftPanel";
+import SignatureManager, { getActiveSignatureHtml } from "@/components/compose/SignatureManager";
 
 export interface ComposeModalProps {
   open: boolean;
@@ -37,18 +37,35 @@ export interface ComposeModalProps {
     body?: string;
     received_at: string;
   };
+  forwardFrom?: {
+    from_name: string;
+    from_address: string;
+    to_addresses: { name?: string; email: string }[];
+    subject: string;
+    body?: string;
+    snippet: string;
+    received_at: string;
+    has_attachments?: boolean;
+  };
   initialCc?: string;
 }
 
-const TONES: { value: DraftTone; label: string }[] = [
-  { value: "professional", label: "Professional" },
-  { value: "friendly", label: "Friendly" },
-  { value: "firm", label: "Firm" },
-  { value: "empathetic", label: "Empathetic" },
-  { value: "concise", label: "Concise" },
-];
+const DRAFT_STORAGE_KEY = "inbox-agent-draft";
 
-export default function ComposeModal({ open, onClose, replyTo, initialCc }: ComposeModalProps) {
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function loadDraft(): { to: string; cc: string; bcc: string; subject: string; body: string } | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export default function ComposeModal({ open, onClose, replyTo, forwardFrom, initialCc }: ComposeModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -57,18 +74,15 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
   const [bcc, setBcc] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [fromEmail, setFromEmail] = useState("");
-
-  // AI draft state
   const [showAiPanel, setShowAiPanel] = useState(false);
-  const [tone, setTone] = useState<DraftTone>("professional");
-  const [aiContext, setAiContext] = useState("");
-  const [generating, setGenerating] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Fetch account on open
+  // ─── Fetch account ───
   useEffect(() => {
     if (!open || !user?.id) return;
     awsApi.getAccounts(user.id).then((data) => {
@@ -80,32 +94,90 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
     }).catch(() => {});
   }, [open, user?.id, user?.email]);
 
-  // Pre-fill for replies
+  // ─── Pre-fill for reply / forward / restore draft ───
   useEffect(() => {
     if (!open) return;
+
     if (replyTo) {
       setTo(replyTo.from_address);
       setSubject(replyTo.subject.startsWith("Re:") ? replyTo.subject : `Re: ${replyTo.subject}`);
-      setBody("");
-    } else {
+      if (bodyRef.current) {
+        const sig = getActiveSignatureHtml();
+        bodyRef.current.innerHTML = sig;
+      }
+    } else if (forwardFrom) {
       setTo("");
-      setSubject("");
-      setBody("");
+      const fwdSubject = forwardFrom.subject.startsWith("Fwd:") ? forwardFrom.subject : `Fwd: ${forwardFrom.subject}`;
+      setSubject(fwdSubject);
+      if (bodyRef.current) {
+        const toList = (forwardFrom.to_addresses ?? []).map((r) => r.email).join(", ");
+        const dateStr = format(new Date(forwardFrom.received_at), "MMM d, yyyy 'at' h:mm a");
+        const sig = getActiveSignatureHtml();
+        const attachNote = forwardFrom.has_attachments
+          ? `<p style="color:#888;font-style:italic">[Attachments from original email are not included]</p>`
+          : "";
+        bodyRef.current.innerHTML = `${sig}<br/><br/>---------- Forwarded message ----------<br/>From: ${forwardFrom.from_name || forwardFrom.from_address} &lt;${forwardFrom.from_address}&gt;<br/>Date: ${dateStr}<br/>Subject: ${forwardFrom.subject}<br/>To: ${toList}<br/><br/>${attachNote}${forwardFrom.body || forwardFrom.snippet}`;
+      }
+    } else {
+      // New email — restore draft
+      const draft = loadDraft();
+      if (draft) {
+        setTo(draft.to);
+        setSubject(draft.subject);
+        setCc(draft.cc);
+        setBcc(draft.bcc);
+        setShowCcBcc(!!(draft.cc || draft.bcc));
+        if (bodyRef.current) bodyRef.current.innerHTML = draft.body;
+        setDraftSaved(true);
+      } else {
+        setTo("");
+        setSubject("");
+        if (bodyRef.current) {
+          const sig = getActiveSignatureHtml();
+          bodyRef.current.innerHTML = sig;
+        }
+      }
     }
+
     setCc(initialCc ?? "");
     setBcc("");
     setShowCcBcc(!!initialCc);
     setShowAiPanel(false);
-    setAiContext("");
-  }, [open, replyTo, initialCc]);
+    setDraftSaved(false);
+  }, [open, replyTo, forwardFrom, initialCc]);
 
+  // ─── Auto-save draft (new emails only) ───
+  const saveDraft = useCallback(() => {
+    if (replyTo || forwardFrom) return;
+    const body = bodyRef.current?.innerHTML ?? "";
+    if (!to && !subject && !body) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ to, cc, bcc, subject, body }));
+    setDraftSaved(true);
+  }, [to, cc, bcc, subject, replyTo, forwardFrom]);
+
+  useEffect(() => {
+    if (!open) return;
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(saveDraft, 1500);
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [to, cc, bcc, subject, open, saveDraft]);
+
+  const handleBodyInput = () => {
+    setDraftSaved(false);
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(saveDraft, 1500);
+  };
+
+  // ─── Helpers ───
   const parseRecipients = (input: string) =>
-    input
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((email) => ({ email }));
+    input.split(",").map((s) => s.trim()).filter(Boolean).map((email) => ({ email }));
 
+  const getBody = () => bodyRef.current?.innerHTML ?? "";
+
+  // ─── Send ───
   const handleSend = useCallback(async () => {
     if (!user?.id || !accountId) {
       toast({ title: "No email account connected", variant: "destructive" });
@@ -116,6 +188,16 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
       toast({ title: "Please add at least one recipient", variant: "destructive" });
       return;
     }
+    // Validate emails
+    const invalidEmails = recipients.filter((r) => !isValidEmail(r.email));
+    if (invalidEmails.length > 0) {
+      toast({
+        title: "Invalid email address",
+        description: `Please fix: ${invalidEmails.map((r) => r.email).join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
     if (!subject.trim()) {
       toast({ title: "Please add a subject", variant: "destructive" });
       return;
@@ -123,6 +205,7 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
 
     setSending(true);
     try {
+      const body = getBody() || "<p></p>";
       await awsApi.sendEmail({
         user_id: user.id,
         account_id: accountId,
@@ -130,55 +213,55 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
         cc: cc ? parseRecipients(cc) : undefined,
         bcc: bcc ? parseRecipients(bcc) : undefined,
         subject,
-        body: body || "<p></p>",
+        body,
         reply_to_message_id: replyTo?.nylas_id,
       });
-      toast({ title: "Email sent successfully" });
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      toast({ title: "✓ Email sent successfully" });
       onClose();
     } catch {
       toast({ title: "Failed to send email", variant: "destructive" });
     } finally {
       setSending(false);
     }
-  }, [user?.id, accountId, to, cc, bcc, subject, body, replyTo, toast, onClose]);
+  }, [user?.id, accountId, to, cc, bcc, subject, replyTo, toast, onClose]);
 
-  const handleGenerateDraft = useCallback(async () => {
-    setGenerating(true);
-    try {
-      const draft = await generateDraft({
-        originalEmail: replyTo
-          ? {
-              from: `${replyTo.from_name} <${replyTo.from_address}>`,
-              subject: replyTo.subject,
-              body: replyTo.body ?? replyTo.snippet,
-              date: replyTo.received_at,
-            }
-          : undefined,
-        tone,
-        context: aiContext || undefined,
-        isReply: !!replyTo,
-      });
-      setBody(draft.body);
-      if (!replyTo && draft.subject) setSubject(draft.subject);
-      toast({ title: "AI draft generated" });
-    } catch (err: any) {
-      toast({ title: err?.message || "Failed to generate draft", variant: "destructive" });
-    } finally {
-      setGenerating(false);
-    }
-  }, [replyTo, tone, aiContext, toast]);
+  // ─── AI draft callbacks ───
+  const applyDraft = useCallback((body: string, draftSubject?: string) => {
+    if (bodyRef.current) bodyRef.current.innerHTML = body;
+    if (!replyTo && draftSubject) setSubject(draftSubject);
+  }, [replyTo]);
 
+  const applyDraftAndClose = useCallback((body: string, draftSubject?: string) => {
+    applyDraft(body, draftSubject);
+    setShowAiPanel(false);
+  }, [applyDraft]);
+
+  // ─── Quoted block ───
   const quotedBlock = replyTo
-    ? `\n\n---\nOn ${format(new Date(replyTo.received_at), "MMM d, yyyy 'at' h:mm a")}, ${replyTo.from_name || replyTo.from_address} wrote:\n> ${(replyTo.snippet || "").replace(/\n/g, "\n> ")}`
+    ? `<div style="margin-top:16px;padding-top:8px;border-top:1px solid #444;color:#888;font-size:12px">On ${format(new Date(replyTo.received_at), "MMM d, yyyy 'at' h:mm a")}, ${replyTo.from_name || replyTo.from_address} wrote:<br/><blockquote style="margin:8px 0 0 8px;padding-left:8px;border-left:2px solid #555">${replyTo.snippet}</blockquote></div>`
     : "";
+
+  const isNewEmail = !replyTo && !forwardFrom;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 p-0 overflow-hidden">
         <DialogHeader className="flex-row items-center justify-between border-b border-border px-4 py-3">
-          <DialogTitle className="text-base font-semibold">
-            {replyTo ? `Reply to: ${replyTo.subject}` : "New Email"}
-          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle className="text-base font-semibold">
+              {replyTo
+                ? `Reply to: ${replyTo.subject}`
+                : forwardFrom
+                ? `Forward: ${forwardFrom.subject}`
+                : "New Email"}
+            </DialogTitle>
+            {(draftSaved || isNewEmail) && (
+              <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-muted-foreground/30">
+                Draft
+              </Badge>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="flex flex-1 flex-col overflow-y-auto">
@@ -243,73 +326,38 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
             />
           </div>
 
-          {/* Body */}
+          {/* Rich text toolbar */}
+          <RichTextToolbar />
+
+          {/* Body (contentEditable) */}
           <div className="flex-1 px-4 py-3">
-            <Textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Write your email..."
-              className="min-h-[200px] resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+            <div
+              ref={bodyRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleBodyInput}
+              className="min-h-[180px] text-sm text-foreground outline-none [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+              data-placeholder="Write your email..."
+              style={{ minHeight: 180 }}
             />
             {replyTo && (
-              <pre className="mt-4 whitespace-pre-wrap text-xs text-muted-foreground">{quotedBlock}</pre>
+              <div className="mt-4" dangerouslySetInnerHTML={{ __html: quotedBlock }} />
             )}
           </div>
 
           {/* AI Draft Panel */}
           {showAiPanel && (
-            <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-foreground">AI Draft Assistant</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {TONES.map((t) => (
-                  <Button
-                    key={t.value}
-                    variant={tone === t.value ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setTone(t.value)}
-                  >
-                    {t.label}
-                  </Button>
-                ))}
-              </div>
-              <Input
-                value={aiContext}
-                onChange={(e) => setAiContext(e.target.value)}
-                placeholder="Instructions: e.g. 'decline politely' or 'ask for invoice details'"
-                className="text-sm"
-              />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleGenerateDraft} disabled={generating}>
-                  {generating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate Draft
-                    </>
-                  )}
-                </Button>
-                {body && (
-                  <Button variant="outline" size="sm" onClick={handleGenerateDraft} disabled={generating}>
-                    <RefreshCw className="h-4 w-4" />
-                    Regenerate
-                  </Button>
-                )}
-              </div>
-            </div>
+            <AIDraftPanel
+              replyTo={replyTo}
+              onApplyDraft={applyDraft}
+              onApplyAndClose={applyDraftAndClose}
+            />
           )}
         </div>
 
         {/* Bottom toolbar */}
         <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button onClick={handleSend} disabled={sending}>
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Send
@@ -321,8 +369,12 @@ export default function ComposeModal({ open, onClose, replyTo, initialCc }: Comp
               <Sparkles className="h-4 w-4" />
               AI Draft
             </Button>
+            <SignatureManager />
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            onClose();
+          }}>
             <Trash2 className="h-4 w-4 text-muted-foreground" />
           </Button>
         </div>

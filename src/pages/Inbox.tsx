@@ -40,6 +40,7 @@ import {
   PenSquare,
   Reply,
   ReplyAll,
+  Forward,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -105,6 +106,7 @@ export default function Inbox() {
   // Compose modal state
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeReplyTo, setComposeReplyTo] = useState<any>(null);
+  const [composeForwardFrom, setComposeForwardFrom] = useState<any>(null);
   const [composeInitialCc, setComposeInitialCc] = useState("");
 
   const limit = 25;
@@ -512,6 +514,7 @@ export default function Inbox() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => {
+                setComposeForwardFrom(null);
                 setComposeInitialCc("");
                 setComposeReplyTo({
                   id: selectedEmail.id,
@@ -530,6 +533,7 @@ export default function Inbox() {
               </Button>
               {(selectedEmail.to_addresses?.length > 1 || selectedEmail.to_addresses?.some(r => r.email !== selectedEmail.from_address)) && (
                 <Button variant="outline" size="sm" onClick={() => {
+                  setComposeForwardFrom(null);
                   const userEmail = selectedEmail.account_email || user?.email || "";
                   const ccRecipients = (selectedEmail.to_addresses ?? [])
                     .filter(r => r.email !== selectedEmail.from_address && r.email !== userEmail)
@@ -551,6 +555,24 @@ export default function Inbox() {
                   Reply All
                 </Button>
               )}
+              <Button variant="outline" size="sm" onClick={() => {
+                setComposeReplyTo(null);
+                setComposeInitialCc("");
+                setComposeForwardFrom({
+                  from_name: selectedEmail.from_name,
+                  from_address: selectedEmail.from_address,
+                  to_addresses: selectedEmail.to_addresses,
+                  subject: selectedEmail.subject,
+                  body: emailBody ?? undefined,
+                  snippet: selectedEmail.snippet,
+                  received_at: selectedEmail.received_at,
+                  has_attachments: selectedEmail.has_attachments,
+                });
+                setComposeOpen(true);
+              }}>
+                <Forward className="h-4 w-4" />
+                Forward
+              </Button>
               <div className="flex-1" />
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
                 <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
@@ -640,8 +662,9 @@ export default function Inbox() {
 
       <ComposeModal
         open={composeOpen}
-        onClose={() => setComposeOpen(false)}
+        onClose={() => { setComposeOpen(false); setComposeReplyTo(null); setComposeForwardFrom(null); }}
         replyTo={composeReplyTo ?? undefined}
+        forwardFrom={composeForwardFrom ?? undefined}
         initialCc={composeInitialCc}
       />
     </div>
