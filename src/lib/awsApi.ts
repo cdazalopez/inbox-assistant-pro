@@ -70,4 +70,23 @@ export const awsApi = {
     const res = await fetch(`${API_BASE}/analysis?user_id=${userId}`);
     return res.json();
   },
+
+  sendEmail: async (params: {
+    user_id: string;
+    account_id: string;
+    to: { email: string; name?: string }[];
+    cc?: { email: string; name?: string }[];
+    bcc?: { email: string; name?: string }[];
+    subject: string;
+    body: string;
+    reply_to_message_id?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to send email');
+    return res.json();
+  },
 };

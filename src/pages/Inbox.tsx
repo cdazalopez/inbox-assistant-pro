@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLabels } from "@/hooks/useLabels";
 import { awsApi } from "@/lib/awsApi";
 import { getOrAnalyze } from "@/services/aiAnalysis";
+import ComposeModal from "@/components/ComposeModal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,8 @@ import {
   X,
   Loader2,
   Brain,
+  PenSquare,
+  Reply,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -97,6 +100,10 @@ export default function Inbox() {
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
+
+  // Compose modal state
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeReplyTo, setComposeReplyTo] = useState<any>(null);
 
   const limit = 25;
 
@@ -306,6 +313,10 @@ export default function Inbox() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => { setComposeReplyTo(null); setComposeOpen(true); }}>
+            <PenSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">Compose</span>
+          </Button>
           <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -498,6 +509,21 @@ export default function Inbox() {
               <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedEmail(null)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                setComposeReplyTo({
+                  id: selectedEmail.id,
+                  from_name: selectedEmail.from_name,
+                  from_address: selectedEmail.from_address,
+                  subject: selectedEmail.subject,
+                  snippet: selectedEmail.snippet,
+                  body: emailBody ?? undefined,
+                  received_at: selectedEmail.received_at,
+                });
+                setComposeOpen(true);
+              }}>
+                <Reply className="h-4 w-4" />
+                Reply
+              </Button>
               <div className="flex-1" />
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
                 <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
@@ -584,6 +610,12 @@ export default function Inbox() {
           </div>
         )}
       </div>
+
+      <ComposeModal
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        replyTo={composeReplyTo ?? undefined}
+      />
     </div>
   );
 }
