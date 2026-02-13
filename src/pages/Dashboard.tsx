@@ -15,6 +15,8 @@ import {
   URGENCY_DOT_COLORS,
   getUrgencyLevel,
 } from "@/components/inbox/types";
+import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
+import SuggestionCard from "@/components/suggestions/SuggestionCard";
 import {
   Mail,
   MailOpen,
@@ -89,6 +91,7 @@ export default function Dashboard() {
   const [remainingUnanalyzed, setRemainingUnanalyzed] = useState<number>(0);
   const [todayBriefing, setTodayBriefing] = useState<Briefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
+  const [allEmails, setAllEmails] = useState<Email[]>([]);
   const notifyUrgentEmails = useCallback(
     (newEntries: Record<string, EmailAnalysis>, emailsLookup: Email[]) => {
       const emailMap = new Map(emailsLookup.map((e) => [e.id, e]));
@@ -141,11 +144,12 @@ export default function Dashboard() {
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
-    const [totalRes, unreadRes, recentRes, analysesRes] = await Promise.allSettled([
+    const [totalRes, unreadRes, recentRes, analysesRes, allEmailsRes] = await Promise.allSettled([
       awsApi.getEmails(user.id, 1, 1, "inbox"),
       awsApi.getEmails(user.id, 1, 1, "unread"),
       awsApi.getEmails(user.id, 1, 5, "unread"),
       awsApi.getAllAnalyses(user.id),
+      awsApi.getEmails(user.id, 1, 100, "inbox"),
     ]);
 
     if (totalRes.status === "fulfilled") setTotalCount(totalRes.value.total ?? 0);
@@ -163,6 +167,7 @@ export default function Dashboard() {
         setAnalysesMap(raw as Record<string, EmailAnalysis>);
       }
     }
+    if (allEmailsRes.status === "fulfilled") setAllEmails(allEmailsRes.value.emails ?? []);
   }, [user?.id]);
 
   useEffect(() => {
@@ -203,6 +208,15 @@ export default function Dashboard() {
     if (!analysesMap) return null;
     return Object.values(analysesMap).filter((a) => a.urgency >= 4).length;
   }, [analysesMap]);
+
+  const smartSuggestions = useMemo(() => {
+    if (!allEmails.length || !analysesMap) return [];
+    return generateSuggestions({ emails: allEmails, analysesMap });
+  }, [allEmails, analysesMap]);
+
+  const handleSuggestionAction = useCallback((s: SmartSuggestion) => {
+    navigate("/inbox");
+  }, [navigate]);
 
   const categoryCounts = useMemo(() => {
     if (!analysesMap) return null;
@@ -453,6 +467,11 @@ export default function Dashboard() {
 
         {/* Right column */}
         <div className="space-y-6">
+          {/* Smart Suggestions */}
+          <SuggestionCard
+            suggestions={smartSuggestions}
+            onAction={handleSuggestionAction}
+          />
           {/* Category Breakdown */}
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border px-5 py-4">

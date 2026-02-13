@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLabels } from "@/hooks/useLabels";
 import { awsApi } from "@/lib/awsApi";
 import { getOrAnalyze } from "@/services/aiAnalysis";
+import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
+import InboxSuggestionBar from "@/components/suggestions/InboxSuggestionBar";
 import ComposeModal from "@/components/ComposeModal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -124,6 +126,8 @@ export default function Inbox() {
           if (a.email_id) map[a.email_id] = a;
         }
         setAnalysesMap(map);
+      } else if (data && typeof data === "object") {
+        setAnalysesMap(data as Record<string, EmailAnalysis>);
       }
     } catch {
       // silently fail — badges are optional
@@ -313,6 +317,35 @@ export default function Inbox() {
     [emails]
   );
 
+  const inboxSuggestions = useMemo(() => {
+    if (emails.length === 0 || Object.keys(analysesMap).length === 0) return [];
+    return generateSuggestions({ emails, analysesMap, unreadIds: unreadEmailIds });
+  }, [emails, analysesMap, unreadEmailIds]);
+
+  const handleSuggestionAction = useCallback((s: SmartSuggestion) => {
+    if (s.type === "bulk_archive" && s.action === "archive") {
+      // Archive all emails in the suggestion
+      Promise.all(s.emailIds.map((id) => awsApi.updateEmail(id, "archive")))
+        .then(() => {
+          setEmails((prev) => prev.filter((e) => !s.emailIds.includes(e.id)));
+          toast({ title: `Archived ${s.emailIds.length} emails` });
+        })
+        .catch(() => toast({ title: "Archive failed", variant: "destructive" }));
+    } else if (s.type === "reply_urgent" || s.type === "review_risk" || s.type === "follow_up") {
+      // Select the first email from the suggestion
+      const target = emails.find((e) => s.emailIds.includes(e.id));
+      if (target) handleSelectEmail(target);
+    } else if (s.type === "group_sender") {
+      // Filter by sender
+      const target = emails.find((e) => s.emailIds.includes(e.id));
+      if (target) {
+        setSearchInput(target.from_address);
+        setSearch(target.from_address);
+        setPage(1);
+      }
+    }
+  }, [emails, toast]);
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       {/* Urgent Banner */}
@@ -324,6 +357,12 @@ export default function Inbox() {
           setFilter("unread");
           setPage(1);
         }}
+      />
+
+      {/* Smart Suggestions Bar */}
+      <InboxSuggestionBar
+        suggestions={inboxSuggestions}
+        onAction={handleSuggestionAction}
       />
 
       {/* Header */}
