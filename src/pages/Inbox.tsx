@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { useLabels } from "@/hooks/useLabels";
 import { awsApi } from "@/lib/awsApi";
 import { getOrAnalyze } from "@/services/aiAnalysis";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import AIInsightsCard from "@/components/inbox/AIInsightsCard";
 import CategoryFilter from "@/components/inbox/CategoryFilter";
+import LabelFilter from "@/components/inbox/LabelFilter";
+import LabelSelector from "@/components/inbox/LabelSelector";
+import LabelManager from "@/components/inbox/LabelManager";
 import {
   Email,
   EmailsResponse,
@@ -61,6 +65,15 @@ function formatFullDate(dateStr: string | null | undefined): string {
 export default function Inbox() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const {
+    labels,
+    emailLabelsMap,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+    toggleEmailLabel,
+    getLabelsForEmail,
+  } = useLabels();
 
   const [emails, setEmails] = useState<Email[]>([]);
   const [totalEmails, setTotalEmails] = useState(0);
@@ -81,6 +94,7 @@ export default function Inbox() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
 
@@ -228,11 +242,17 @@ export default function Inbox() {
     await Promise.all([bodyPromise, analysisPromise]);
   };
 
-  // Filter emails by category
+  // Filter emails by category and label
   const filteredEmails = useMemo(() => {
-    if (!categoryFilter) return emails;
-    return emails.filter((e) => analysesMap[e.id]?.category === categoryFilter);
-  }, [emails, categoryFilter, analysesMap]);
+    let result = emails;
+    if (categoryFilter) {
+      result = result.filter((e) => analysesMap[e.id]?.category === categoryFilter);
+    }
+    if (labelFilter) {
+      result = result.filter((e) => (emailLabelsMap[e.id] ?? []).includes(labelFilter));
+    }
+    return result;
+  }, [emails, categoryFilter, labelFilter, analysesMap, emailLabelsMap]);
 
   const handleBatchAnalyze = useCallback(async () => {
     if (!user?.id || batchAnalyzing) return;
@@ -309,6 +329,12 @@ export default function Inbox() {
               </>
             )}
           </Button>
+          <LabelManager
+            labels={labels}
+            onCreateLabel={createLabel}
+            onUpdateLabel={updateLabel}
+            onDeleteLabel={deleteLabel}
+          />
           <Button variant="outline" size="sm" onClick={syncAndLoad} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Sync</span>
@@ -330,6 +356,9 @@ export default function Inbox() {
 
       {/* Category filter */}
       <CategoryFilter selected={categoryFilter} onChange={setCategoryFilter} />
+
+      {/* Label filter */}
+      <LabelFilter labels={labels} selectedLabelId={labelFilter} onChange={setLabelFilter} />
 
       {/* Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -420,7 +449,18 @@ export default function Inbox() {
                           </span>
                         )}
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
+                        {getLabelsForEmail(email.id).map((lbl) => (
+                          <span
+                            key={lbl.id}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-0 text-[10px] font-medium leading-4 text-foreground/70"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: lbl.color }} />
+                            {lbl.name}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {formatRelativeDate(email.received_at)}
@@ -468,6 +508,12 @@ export default function Inbox() {
               <Button variant="ghost" size="icon" onClick={() => handleMarkUnread(selectedEmail)}>
                 <MailOpen className="h-4 w-4 text-muted-foreground" />
               </Button>
+              <LabelSelector
+                labels={labels}
+                activeLabelsIds={emailLabelsMap[selectedEmail.id] ?? []}
+                onToggle={(labelId) => toggleEmailLabel(selectedEmail.id, labelId)}
+                onCreateLabel={createLabel}
+              />
               <Button variant="ghost" size="icon" onClick={() => setSelectedEmail(null)} className="hidden md:flex">
                 <X className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -476,6 +522,25 @@ export default function Inbox() {
               <h2 className="text-xl font-semibold text-foreground">
                 {selectedEmail.subject || "(No subject)"}
               </h2>
+              {/* Labels on detail view */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {getLabelsForEmail(selectedEmail.id).map((lbl) => (
+                  <span
+                    key={lbl.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground/80"
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: lbl.color }} />
+                    {lbl.name}
+                  </span>
+                ))}
+                <LabelSelector
+                  labels={labels}
+                  activeLabelsIds={emailLabelsMap[selectedEmail.id] ?? []}
+                  onToggle={(labelId) => toggleEmailLabel(selectedEmail.id, labelId)}
+                  onCreateLabel={createLabel}
+                  triggerVariant="badge"
+                />
+              </div>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary">
                   {(selectedEmail.from_name || selectedEmail.from_address || "?")[0].toUpperCase()}
