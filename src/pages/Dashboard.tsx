@@ -18,6 +18,7 @@ import {
 import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
 import SuggestionCard from "@/components/suggestions/SuggestionCard";
 import TasksFollowupsWidget from "@/components/tasks/TasksFollowupsWidget";
+import UpcomingMeetingsWidget from "@/components/calendar/UpcomingMeetingsWidget";
 import {
   Mail,
   MailOpen,
@@ -475,6 +476,8 @@ export default function Dashboard() {
           />
           {/* Tasks & Follow-ups Widget */}
           <TasksFollowupsWidget />
+          {/* Upcoming Meetings Widget */}
+          <UpcomingMeetingsWidget />
           {/* Category Breakdown */}
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border px-5 py-4">
