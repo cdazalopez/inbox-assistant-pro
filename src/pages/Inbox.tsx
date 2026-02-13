@@ -6,6 +6,8 @@ import { awsApi } from "@/lib/awsApi";
 import { getOrAnalyze } from "@/services/aiAnalysis";
 import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
 import InboxSuggestionBar from "@/components/suggestions/InboxSuggestionBar";
+import TaskModal from "@/components/tasks/TaskModal";
+import FollowupModal from "@/components/tasks/FollowupModal";
 import ComposeModal from "@/components/ComposeModal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,8 @@ import {
   Reply,
   ReplyAll,
   Forward,
+  ListTodo,
+  CalendarClock,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -112,6 +116,12 @@ export default function Inbox() {
   const [composeReplyTo, setComposeReplyTo] = useState<any>(null);
   const [composeForwardFrom, setComposeForwardFrom] = useState<any>(null);
   const [composeInitialCc, setComposeInitialCc] = useState("");
+
+  // Task/Followup modal state
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskInitialData, setTaskInitialData] = useState<{ title?: string; description?: string; priority?: string; email_id?: string } | undefined>();
+  const [followupModalOpen, setFollowupModalOpen] = useState(false);
+  const [followupEmailId, setFollowupEmailId] = useState<string | undefined>();
 
   const limit = 25;
 
@@ -634,6 +644,27 @@ export default function Inbox() {
                 Forward
               </Button>
               <div className="flex-1" />
+              <Button variant="outline" size="sm" onClick={() => {
+                const analysis = analysesMap[selectedEmail.id];
+                const urgencyToPriority = (u: number) => u >= 4 ? "high" : u >= 3 ? "medium" : "low";
+                setTaskInitialData({
+                  title: selectedEmail.subject || "Follow up",
+                  description: analysis?.summary ?? selectedEmail.snippet,
+                  priority: analysis ? urgencyToPriority(analysis.urgency) : "medium",
+                  email_id: selectedEmail.id,
+                });
+                setTaskModalOpen(true);
+              }}>
+                <ListTodo className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Task</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                setFollowupEmailId(selectedEmail.id);
+                setFollowupModalOpen(true);
+              }}>
+                <CalendarClock className="h-4 w-4" />
+                <span className="hidden sm:inline">Follow-up</span>
+              </Button>
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
                 <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
               </Button>
@@ -726,6 +757,28 @@ export default function Inbox() {
         replyTo={composeReplyTo ?? undefined}
         forwardFrom={composeForwardFrom ?? undefined}
         initialCc={composeInitialCc}
+      />
+
+      <TaskModal
+        open={taskModalOpen}
+        onClose={() => { setTaskModalOpen(false); setTaskInitialData(undefined); }}
+        onSave={async (data) => {
+          if (!user?.id) return;
+          await awsApi.createTask({ user_id: user.id, ...data });
+          toast({ title: "Task created" });
+        }}
+        initialData={taskInitialData}
+      />
+
+      <FollowupModal
+        open={followupModalOpen}
+        onClose={() => { setFollowupModalOpen(false); setFollowupEmailId(undefined); }}
+        onSave={async (data) => {
+          if (!user?.id) return;
+          await awsApi.createFollowup({ user_id: user.id, ...data });
+          toast({ title: "Follow-up created" });
+        }}
+        initialEmailId={followupEmailId}
       />
     </div>
   );

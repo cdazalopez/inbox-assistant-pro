@@ -17,6 +17,7 @@ import {
 } from "@/components/inbox/types";
 import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
 import SuggestionCard from "@/components/suggestions/SuggestionCard";
+import TasksFollowupsWidget from "@/components/tasks/TasksFollowupsWidget";
 import {
   Mail,
   MailOpen,
@@ -472,6 +473,8 @@ export default function Dashboard() {
             suggestions={smartSuggestions}
             onAction={handleSuggestionAction}
           />
+          {/* Tasks & Follow-ups Widget */}
+          <TasksFollowupsWidget />
           {/* Category Breakdown */}
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border px-5 py-4">
