@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
+import { getOrAnalyze } from "@/services/aiAnalysis";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import AIInsightsCard from "@/components/inbox/AIInsightsCard";
+import CategoryFilter from "@/components/inbox/CategoryFilter";
+import {
+  Email,
+  EmailsResponse,
+  EmailAnalysis,
+  CATEGORY_COLORS,
+  URGENCY_DOT_COLORS,
+  getUrgencyLevel,
+} from "@/components/inbox/types";
 import {
   RefreshCw,
   Search,
@@ -21,27 +32,6 @@ import {
   X,
   Loader2,
 } from "lucide-react";
-
-interface Email {
-  id: string;
-  subject: string;
-  from_name: string;
-  from_address: string;
-  snippet: string;
-  received_at: string;
-  is_read: boolean;
-  is_starred: boolean;
-  has_attachments: boolean;
-  labels?: string[];
-}
-
-interface EmailsResponse {
-  emails: Email[];
-  total: number;
-  page: number;
-  limit: number;
-  total_pages: number;
-}
 
 function safeDate(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
@@ -84,7 +74,31 @@ export default function Inbox() {
   const [emailBody, setEmailBody] = useState<string | null>(null);
   const [loadingBody, setLoadingBody] = useState(false);
 
+  // AI analysis state
+  const [analysesMap, setAnalysesMap] = useState<Record<string, EmailAnalysis>>({});
+  const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+
   const limit = 25;
+
+  // Fetch all analyses for list badges
+  const fetchAnalyses = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const data = await awsApi.getAllAnalyses(user.id);
+      if (Array.isArray(data)) {
+        const map: Record<string, EmailAnalysis> = {};
+        for (const a of data) {
+          if (a.email_id) map[a.email_id] = a;
+        }
+        setAnalysesMap(map);
+      }
+    } catch {
+      // silently fail — badges are optional
+    }
+  }, [user?.id]);
 
   const fetchEmails = useCallback(
     async (p = page, f = filter, s = search) => {
@@ -117,15 +131,14 @@ export default function Inbox() {
       setSyncing(false);
     }
     fetchEmails(1, filter, search);
-  }, [user?.id, filter, search, fetchEmails, toast]);
+    fetchAnalyses();
+  }, [user?.id, filter, search, fetchEmails, fetchAnalyses, toast]);
 
-  // Auto-sync on mount
   useEffect(() => {
     if (user?.id) syncAndLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Refetch when page/filter/search change (not on mount)
   useEffect(() => {
     if (user?.id && !syncing) fetchEmails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,23 +191,45 @@ export default function Inbox() {
     setSelectedEmail(email);
     setEmailBody(null);
     setLoadingBody(true);
-    // Mark as read
+    setCurrentAnalysis(null);
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+
     if (!email.is_read) {
       awsApi.updateEmail(email.id, "mark_read").catch(() => {});
       setEmails((prev) =>
         prev.map((em) => (em.id === email.id ? { ...em, is_read: true } : em))
       );
     }
-    // Fetch full body
-    try {
-      const data = await awsApi.getEmail(email.id);
+
+    // Fetch body and analysis in parallel
+    const bodyPromise = awsApi.getEmail(email.id).then((data) => {
       setEmailBody(data.body ?? data.html_body ?? null);
-    } catch {
-      setEmailBody(null);
-    } finally {
-      setLoadingBody(false);
-    }
+    }).catch(() => setEmailBody(null)).finally(() => setLoadingBody(false));
+
+    const analysisPromise = getOrAnalyze(email.id, {
+      id: email.id,
+      from_name: email.from_name,
+      from_address: email.from_address,
+      subject: email.subject,
+      snippet: email.snippet,
+      user_id: user?.id ?? "",
+    }).then((result) => {
+      setCurrentAnalysis(result);
+      // Update the analyses map so the list badge shows immediately
+      setAnalysesMap((prev) => ({ ...prev, [email.id]: result }));
+    }).catch((err) => {
+      setAnalysisError(err?.message ?? "Analysis failed");
+    }).finally(() => setAnalysisLoading(false));
+
+    await Promise.all([bodyPromise, analysisPromise]);
   };
+
+  // Filter emails by category
+  const filteredEmails = useMemo(() => {
+    if (!categoryFilter) return emails;
+    return emails.filter((e) => analysesMap[e.id]?.category === categoryFilter);
+  }, [emails, categoryFilter, analysesMap]);
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
@@ -217,12 +252,7 @@ export default function Inbox() {
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={syncAndLoad}
-            disabled={syncing}
-          >
+          <Button variant="outline" size="sm" onClick={syncAndLoad} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Sync</span>
           </Button>
@@ -240,6 +270,9 @@ export default function Inbox() {
           </TabsList>
         </Tabs>
       </div>
+
+      {/* Category filter */}
+      <CategoryFilter selected={categoryFilter} onChange={setCategoryFilter} />
 
       {/* Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -263,63 +296,81 @@ export default function Inbox() {
                 </div>
               ))}
             </div>
-          ) : emails.length === 0 ? (
+          ) : filteredEmails.length === 0 ? (
             <div className="flex h-full items-center justify-center">
-              <p className="text-muted-foreground">No emails found</p>
+              <p className="text-muted-foreground">
+                {categoryFilter ? `No ${categoryFilter} emails found` : "No emails found"}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {emails.map((email) => (
-                <button
-                  key={email.id}
-                  onClick={() => handleSelectEmail(email)}
-                  className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
-                    selectedEmail?.id === email.id ? "bg-muted" : ""
-                  } ${!email.is_read ? "bg-muted/30" : ""}`}
-                >
-                  <Checkbox
-                    onClick={(e) => e.stopPropagation()}
-                    className="shrink-0"
-                  />
+              {filteredEmails.map((email) => {
+                const analysis = analysesMap[email.id];
+                const urgencyLevel = analysis ? getUrgencyLevel(analysis.urgency) : null;
+                const urgencyDotClass = urgencyLevel ? URGENCY_DOT_COLORS[urgencyLevel] : null;
+                const catClass = analysis
+                  ? CATEGORY_COLORS[analysis.category] ?? CATEGORY_COLORS.general
+                  : null;
+
+                return (
                   <button
-                    onClick={(e) => handleStar(e, email)}
-                    className="shrink-0"
+                    key={email.id}
+                    onClick={() => handleSelectEmail(email)}
+                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
+                      selectedEmail?.id === email.id ? "bg-muted" : ""
+                    } ${!email.is_read ? "bg-muted/30" : ""}`}
                   >
-                    <Star
-                      className={`h-4 w-4 ${
-                        email.is_starred
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-muted-foreground hover:text-yellow-400"
-                      }`}
-                    />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`truncate text-sm ${
-                          !email.is_read ? "font-semibold text-foreground" : "text-foreground/80"
-                        }`}
-                      >
-                        {email.from_name || email.from_address}
-                      </span>
-                      {email.has_attachments && (
-                        <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    {/* Urgency dot */}
+                    <div className="flex w-2.5 shrink-0 items-center justify-center">
+                      {urgencyDotClass && (
+                        <div className={`h-2 w-2 rounded-full ${urgencyDotClass}`} />
                       )}
                     </div>
-                    <p
-                      className={`truncate text-sm ${
-                        !email.is_read ? "font-medium text-foreground/90" : "text-muted-foreground"
-                      }`}
-                    >
-                      {email.subject}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatRelativeDate(email.received_at)}
-                  </span>
-                </button>
-              ))}
+                    <Checkbox onClick={(e) => e.stopPropagation()} className="shrink-0" />
+                    <button onClick={(e) => handleStar(e, email)} className="shrink-0">
+                      <Star
+                        className={`h-4 w-4 ${
+                          email.is_starred
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-muted-foreground hover:text-yellow-400"
+                        }`}
+                      />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`truncate text-sm ${
+                            !email.is_read ? "font-semibold text-foreground" : "text-foreground/80"
+                          }`}
+                        >
+                          {email.from_name || email.from_address}
+                        </span>
+                        {email.has_attachments && (
+                          <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <p
+                          className={`truncate text-sm ${
+                            !email.is_read ? "font-medium text-foreground/90" : "text-muted-foreground"
+                          }`}
+                        >
+                          {email.subject}
+                        </p>
+                        {catClass && (
+                          <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${catClass}`}>
+                            {analysis!.category}
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatRelativeDate(email.received_at)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -330,21 +381,11 @@ export default function Inbox() {
                 Page {page} of {totalPages}
               </span>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
                   Next
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -357,23 +398,12 @@ export default function Inbox() {
         {selectedEmail && (
           <div className="flex flex-1 flex-col overflow-y-auto">
             <div className="flex items-center gap-2 border-b border-border p-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden"
-                onClick={() => setSelectedEmail(null)}
-              >
+              <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedEmail(null)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="flex-1" />
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
-                <Star
-                  className={`h-4 w-4 ${
-                    selectedEmail.is_starred
-                      ? "fill-yellow-400 text-yellow-400"
-                      : "text-muted-foreground"
-                  }`}
-                />
+                <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
               </Button>
               <Button variant="ghost" size="icon" onClick={() => handleArchive(selectedEmail)}>
                 <Archive className="h-4 w-4 text-muted-foreground" />
@@ -381,12 +411,7 @@ export default function Inbox() {
               <Button variant="ghost" size="icon" onClick={() => handleMarkUnread(selectedEmail)}>
                 <MailOpen className="h-4 w-4 text-muted-foreground" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedEmail(null)}
-                className="hidden md:flex"
-              >
+              <Button variant="ghost" size="icon" onClick={() => setSelectedEmail(null)} className="hidden md:flex">
                 <X className="h-4 w-4 text-muted-foreground" />
               </Button>
             </div>
@@ -408,6 +433,8 @@ export default function Inbox() {
                   {formatFullDate(selectedEmail.received_at)}
                 </span>
               </div>
+
+              {/* Email body */}
               {loadingBody ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -424,6 +451,13 @@ export default function Inbox() {
                   </p>
                 </div>
               )}
+
+              {/* AI Insights */}
+              <AIInsightsCard
+                analysis={currentAnalysis}
+                loading={analysisLoading}
+                error={analysisError}
+              />
             </div>
           </div>
         )}
