@@ -16,8 +16,8 @@ interface ConnectedAccount {
   id: string;
   email: string;
   provider: string;
-  status: string;
-  connected_at?: string;
+  sync_status: string;
+  created_at?: string;
 }
 
 export default function Settings() {
@@ -142,21 +142,21 @@ export default function Settings() {
                   <ProviderIcon provider={account.provider} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{account.email}</p>
-                    {account.connected_at && (
+                    {account.created_at && (
                       <p className="text-xs text-muted-foreground">
-                        Connected {new Date(account.connected_at).toLocaleDateString()}
+                        Connected {new Date(account.created_at).toLocaleDateString()}
                       </p>
                     )}
                   </div>
                   <Badge
-                    variant={account.status === "active" ? "default" : "secondary"}
+                    variant={account.sync_status === "active" ? "default" : "secondary"}
                     className={
-                      account.status === "active"
+                      account.sync_status === "active"
                         ? "bg-green-600 hover:bg-green-600 text-white"
                         : "bg-yellow-600 hover:bg-yellow-600 text-white"
                     }
                   >
-                    {account.status === "active" ? "Active" : "Pending"}
+                    {account.sync_status === "active" ? "Active" : "Pending"}
                   </Badge>
                 </div>
               ))}
