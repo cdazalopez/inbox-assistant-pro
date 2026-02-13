@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Loader2,
 } from "lucide-react";
 
 interface Email {
@@ -70,6 +71,8 @@ export default function Inbox() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [emailBody, setEmailBody] = useState<string | null>(null);
+  const [loadingBody, setLoadingBody] = useState(false);
 
   const limit = 25;
 
@@ -163,15 +166,23 @@ export default function Inbox() {
 
   const handleSelectEmail = async (email: Email) => {
     setSelectedEmail(email);
+    setEmailBody(null);
+    setLoadingBody(true);
+    // Mark as read
     if (!email.is_read) {
-      try {
-        await awsApi.updateEmail(email.id, "mark_read");
-        setEmails((prev) =>
-          prev.map((em) => (em.id === email.id ? { ...em, is_read: true } : em))
-        );
-      } catch {
-        /* silent */
-      }
+      awsApi.updateEmail(email.id, "mark_read").catch(() => {});
+      setEmails((prev) =>
+        prev.map((em) => (em.id === email.id ? { ...em, is_read: true } : em))
+      );
+    }
+    // Fetch full body
+    try {
+      const data = await awsApi.getEmail(email.id);
+      setEmailBody(data.body ?? data.html_body ?? null);
+    } catch {
+      setEmailBody(null);
+    } finally {
+      setLoadingBody(false);
     }
   };
 
@@ -387,11 +398,22 @@ export default function Inbox() {
                   {new Date(selectedEmail.date).toLocaleString()}
                 </span>
               </div>
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                  {selectedEmail.snippet}
-                </p>
-              </div>
+              {loadingBody ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : emailBody ? (
+                <div
+                  className="email-body-content rounded-lg border border-border bg-muted/30 p-4 overflow-x-auto [&_a]:text-primary [&_a]:underline [&_img]:max-w-full [&_img]:h-auto [&_*]:max-w-full"
+                  dangerouslySetInnerHTML={{ __html: emailBody }}
+                />
+              ) : (
+                <div className="rounded-lg border border-border bg-muted/30 p-4">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                    {selectedEmail.snippet}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
