@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Inbox from "./pages/Inbox";
 import Briefings from "./pages/Briefings";
 import Settings from "./pages/Settings";
+import Tasks from "./pages/Tasks";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -48,7 +49,7 @@ const App = () => (
               path="/tasks"
               element={
                 <ProtectedRoute>
-                  <DashboardLayout><Placeholder /></DashboardLayout>
+                  <DashboardLayout><Tasks /></DashboardLayout>
                 </ProtectedRoute>
               }
             />

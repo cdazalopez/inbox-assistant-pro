@@ -115,4 +115,104 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to store briefing');
     return res.json();
   },
+
+  // Tasks
+  getTasks: async (userId: string, status?: string) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (status) params.append('status', status);
+    const res = await fetch(`${API_BASE}/tasks?${params}`);
+    return res.json();
+  },
+
+  createTask: async (params: {
+    user_id: string;
+    title: string;
+    description?: string;
+    email_id?: string;
+    due_date?: string;
+    priority?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to create task');
+    return res.json();
+  },
+
+  updateTask: async (params: {
+    task_id: string;
+    user_id: string;
+    title?: string;
+    description?: string;
+    due_date?: string;
+    priority?: string;
+    status?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/tasks`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to update task');
+    return res.json();
+  },
+
+  deleteTask: async (taskId: string, userId: string) => {
+    const res = await fetch(`${API_BASE}/tasks?task_id=${taskId}&user_id=${userId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete task');
+    return res.json();
+  },
+
+  // Follow-ups
+  getFollowups: async (userId: string, status?: string) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (status) params.append('status', status);
+    const res = await fetch(`${API_BASE}/followups?${params}`);
+    return res.json();
+  },
+
+  createFollowup: async (params: {
+    user_id: string;
+    email_id?: string;
+    type: string;
+    due_date: string;
+    notes?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/followups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to create follow-up');
+    return res.json();
+  },
+
+  updateFollowup: async (params: {
+    followup_id: string;
+    user_id: string;
+    type?: string;
+    due_date?: string;
+    status?: string;
+    notes?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/followups`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to update follow-up');
+    return res.json();
+  },
+
+  deleteFollowup: async (followupId: string, userId: string) => {
+    const res = await fetch(`${API_BASE}/followups?followup_id=${followupId}&user_id=${userId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete follow-up');
+    return res.json();
+  },
 };
