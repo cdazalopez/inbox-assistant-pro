@@ -31,6 +31,8 @@ import {
 } from "@/components/inbox/types";
 import RiskFlagBadges from "@/components/alerts/RiskFlagBadges";
 import UrgentBanner from "@/components/alerts/UrgentBanner";
+import CalendarContext from "@/components/calendar/CalendarContext";
+import { isMeetingEmail } from "@/components/calendar/types";
 import {
   RefreshCw,
   Search,
@@ -49,6 +51,7 @@ import {
   Forward,
   ListTodo,
   CalendarClock,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -518,6 +521,9 @@ export default function Inbox() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
+                        {isMeetingEmail(email.subject, analysis?.category) && (
+                          <CalendarIcon className="h-3 w-3 shrink-0 text-primary" />
+                        )}
                         <p
                           className={`truncate text-sm ${
                             !email.is_read ? "font-medium text-foreground/90" : "text-muted-foreground"
@@ -746,6 +752,11 @@ export default function Inbox() {
                 loading={analysisLoading}
                 error={analysisError}
               />
+
+              {/* Calendar Context - show for meeting-related emails */}
+              {isMeetingEmail(selectedEmail.subject, currentAnalysis?.category) && (
+                <CalendarContext />
+              )}
             </div>
           </div>
         )}

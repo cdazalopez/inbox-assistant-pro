@@ -215,4 +215,16 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to delete follow-up');
     return res.json();
   },
+
+  // Calendar
+  getCalendarEvents: async (userId: string, daysAhead = 7, daysBehind = 1) => {
+    const params = new URLSearchParams({
+      user_id: userId,
+      days_ahead: String(daysAhead),
+      days_behind: String(daysBehind),
+    });
+    const res = await fetch(`${API_BASE}/calendar?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch calendar events');
+    return res.json();
+  },
 };

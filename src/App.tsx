@@ -13,6 +13,7 @@ import Inbox from "./pages/Inbox";
 import Briefings from "./pages/Briefings";
 import Settings from "./pages/Settings";
 import Tasks from "./pages/Tasks";
+import CalendarPage from "./pages/Calendar";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DashboardLayout><Tasks /></DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout><CalendarPage /></DashboardLayout>
                 </ProtectedRoute>
               }
             />
