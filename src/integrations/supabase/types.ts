@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      email_labels: {
+        Row: {
+          created_at: string
+          email_id: string
+          id: string
+          label_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_id: string
+          id?: string
+          label_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_id?: string
+          id?: string
+          label_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labels: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
