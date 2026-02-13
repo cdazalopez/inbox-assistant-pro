@@ -227,4 +227,23 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to fetch calendar events');
     return res.json();
   },
+
+  createCalendarEvent: async (params: {
+    user_id: string;
+    title: string;
+    description?: string;
+    location?: string;
+    start_time: string;
+    end_time: string;
+    all_day?: boolean;
+    participants?: { email: string }[];
+  }) => {
+    const res = await fetch(`${API_BASE}/calendar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to create event');
+    return res.json();
+  },
 };
