@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -38,7 +39,7 @@ const App = () => (
               path="/inbox"
               element={
                 <ProtectedRoute>
-                  <DashboardLayout><Placeholder /></DashboardLayout>
+                  <DashboardLayout><Inbox /></DashboardLayout>
                 </ProtectedRoute>
               }
             />
