@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useLabels } from "@/hooks/useLabels";
@@ -80,6 +81,7 @@ function formatFullDate(dateStr: string | null | undefined): string {
 
 export default function Inbox() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const {
     labels,
@@ -522,7 +524,16 @@ export default function Inbox() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         {isMeetingEmail(email.subject, analysis?.category) && (
-                          <CalendarIcon className="h-3 w-3 shrink-0 text-primary" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate("/calendar");
+                            }}
+                            title="View in Calendar"
+                            className="hover:scale-125 transition-transform"
+                          >
+                            <CalendarIcon className="h-3 w-3 shrink-0 text-primary" />
+                          </button>
                         )}
                         <p
                           className={`truncate text-sm ${
