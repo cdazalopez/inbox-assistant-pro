@@ -22,6 +22,10 @@ import UpcomingMeetingsWidget from "@/components/calendar/UpcomingMeetingsWidget
 import EventReminders from "@/components/calendar/EventReminders";
 import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCard";
 import CommunicationHealthCard from "@/components/dashboard/CommunicationHealthCard";
+import AutopilotToggle from "@/components/autopilot/AutopilotToggle";
+import AutopilotQueue from "@/components/autopilot/AutopilotQueue";
+import { useAutopilot, isAutoDraftable, AutopilotDraft } from "@/hooks/useAutopilot";
+import { generateDraft } from "@/services/aiDraftService";
 import { useVoiceBriefing } from "@/hooks/useVoiceBriefing";
 import {
   Mail,
@@ -88,6 +92,7 @@ export default function Dashboard() {
   const { prefs: alertPrefs } = useAlertPreferences();
   const voice = useVoiceBriefing();
   const toastQueueRef = useRef<string[]>([]);
+  const autopilot = useAutopilot();
 
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
@@ -100,6 +105,8 @@ export default function Dashboard() {
   const [todayBriefing, setTodayBriefing] = useState<Briefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [allEmails, setAllEmails] = useState<Email[]>([]);
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [showAutopilotQueue, setShowAutopilotQueue] = useState(false);
   const notifyUrgentEmails = useCallback(
     (newEntries: Record<string, EmailAnalysis>, emailsLookup: Email[]) => {
       const emailMap = new Map(emailsLookup.map((e) => [e.id, e]));
@@ -180,8 +187,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    // Fetch today's briefing
     if (user?.id) {
+      // Fetch account for autopilot sending
+      awsApi.getAccounts(user.id).then((data) => {
+        const accounts = data?.accounts ?? data;
+        if (Array.isArray(accounts) && accounts.length > 0) {
+          setAccountId(accounts[0].id ?? accounts[0].account_id);
+        }
+      }).catch(() => {});
+      // Fetch today's briefing
       const today = new Date().toISOString().split("T")[0];
       awsApi.getBriefings(user.id, today).then((briefings) => {
         if (briefings?.length > 0) setTodayBriefing(briefings[0]);
@@ -206,6 +220,61 @@ export default function Dashboard() {
     
     data();
   }, []);
+
+  // Autopilot: auto-draft qualifying emails
+  useEffect(() => {
+    if (!autopilot.isActive || !analysesMap || !allEmails.length || !user?.id) return;
+    if (autopilot.processingRef.current) return;
+
+    const qualifying = allEmails.filter((e) => {
+      const analysis = analysesMap[e.id];
+      if (!analysis) return false;
+      if (autopilot.drafts.has(e.id)) return false;
+      return isAutoDraftable(e, analysis, autopilot.prefs);
+    });
+
+    if (qualifying.length === 0) return;
+
+    autopilot.processingRef.current = true;
+    autopilot.setProcessing(true);
+
+    (async () => {
+      const batch = qualifying.slice(0, 5);
+      for (const email of batch) {
+        try {
+          const analysis = analysesMap[email.id];
+          const draft = await generateDraft({
+            originalEmail: {
+              from: `${email.from_name} <${email.from_address}>`,
+              subject: email.subject,
+              body: email.snippet,
+              date: email.received_at,
+            },
+            tone: autopilot.prefs.defaultTone,
+            isReply: true,
+          });
+          const autopilotDraft: AutopilotDraft = {
+            emailId: email.id,
+            email,
+            analysis,
+            draftSubject: draft.subject,
+            draftBody: draft.body,
+            tone: autopilot.prefs.defaultTone,
+            status: "pending",
+            createdAt: new Date().toISOString(),
+          };
+          autopilot.addDraft(autopilotDraft);
+        } catch (err) {
+          console.error("Autopilot draft failed for", email.id, err);
+        }
+      }
+      autopilot.setProcessing(false);
+      autopilot.processingRef.current = false;
+      if (batch.length > 0) {
+        toast({ title: `🤖 Autopilot drafted ${batch.length} replies for review` });
+      }
+    })();
+  }, [autopilot.isActive, analysesMap, allEmails, user?.id]);
 
   const requiresResponseCount = useMemo(() => {
     if (!analysesMap) return null;
@@ -366,12 +435,32 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 p-4 sm:p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Welcome back, {user?.user_metadata?.full_name || "there"}
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Welcome back, {user?.user_metadata?.full_name || "there"}
+          </p>
+        </div>
+        <AutopilotToggle
+          prefs={autopilot.prefs}
+          updatePrefs={autopilot.updatePrefs}
+          pendingCount={autopilot.pendingCount}
+          onOpenQueue={() => setShowAutopilotQueue(!showAutopilotQueue)}
+        />
       </div>
+
+      {/* Autopilot Queue */}
+      {showAutopilotQueue && autopilot.prefs.enabled && (
+        <AutopilotQueue
+          pendingDrafts={autopilot.pendingDrafts}
+          stats={autopilot.stats}
+          onApprove={(id) => autopilot.updateDraftStatus(id, "sent")}
+          onReject={(id, reason) => autopilot.updateDraftStatus(id, "rejected", reason)}
+          onUpdateBody={autopilot.updateDraftBody}
+          accountId={accountId}
+        />
+      )}
 
       {/* Event Reminders */}
       <EventReminders />

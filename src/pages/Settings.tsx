@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAlertPreferences } from "@/hooks/useAlertPreferences";
 import { User, Link2, Bell, Loader2, ShieldAlert } from "lucide-react";
 import VoiceSettingsCard from "@/components/voice/VoiceSettingsCard";
+import AutopilotSettingsCard from "@/components/autopilot/AutopilotSettingsCard";
+import { useAutopilot } from "@/hooks/useAutopilot";
 
 interface ConnectedAccount {
   id: string;
@@ -26,6 +28,7 @@ export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { prefs, update } = useAlertPreferences();
+  const autopilotHook = useAutopilot();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
@@ -264,6 +267,9 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Autopilot Preferences */}
+      <AutopilotSettingsCard prefs={autopilotHook.prefs} updatePrefs={autopilotHook.updatePrefs} />
 
       {/* Voice Briefing */}
       <VoiceSettingsCard />
