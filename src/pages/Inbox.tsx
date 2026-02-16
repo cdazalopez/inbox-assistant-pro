@@ -33,6 +33,8 @@ import {
 import RiskFlagBadges from "@/components/alerts/RiskFlagBadges";
 import UrgentBanner from "@/components/alerts/UrgentBanner";
 import CalendarContext from "@/components/calendar/CalendarContext";
+import ThreadSummaryPanel from "@/components/inbox/ThreadSummaryPanel";
+import { normalizeSubject } from "@/services/threadSummaryService";
 import { isMeetingEmail } from "@/components/calendar/types";
 import {
   RefreshCw,
@@ -53,6 +55,7 @@ import {
   ListTodo,
   CalendarClock,
   Calendar as CalendarIcon,
+  MessageSquare,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -332,6 +335,16 @@ export default function Inbox() {
     [emails]
   );
 
+  // Thread counts for badges
+  const threadCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of emails) {
+      const key = normalizeSubject(e.subject);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }, [emails]);
+
   const inboxSuggestions = useMemo(() => {
     if (emails.length === 0 || Object.keys(analysesMap).length === 0) return [];
     return generateSuggestions({ emails, analysesMap, unreadIds: unreadEmailIds });
@@ -542,6 +555,12 @@ export default function Inbox() {
                         >
                           {email.subject}
                         </p>
+                        {threadCounts[normalizeSubject(email.subject)] >= 3 && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0 gap-0.5">
+                            <MessageSquare className="h-2.5 w-2.5" />
+                            {threadCounts[normalizeSubject(email.subject)]}
+                          </Badge>
+                        )}
                         {catClass && (
                           <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${catClass}`}>
                             {analysis!.category}
@@ -756,6 +775,12 @@ export default function Inbox() {
                   </p>
                 </div>
               )}
+
+              {/* Thread Summary */}
+              <ThreadSummaryPanel
+                selectedEmail={selectedEmail}
+                allEmails={emails}
+              />
 
               {/* AI Insights */}
               <AIInsightsCard
