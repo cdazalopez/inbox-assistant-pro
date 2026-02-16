@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import RichTextToolbar from "@/components/compose/RichTextToolbar";
 import AIDraftPanel from "@/components/compose/AIDraftPanel";
+import DraftToneMonitor from "@/components/compose/DraftToneMonitor";
 import SignatureManager, { getActiveSignatureHtml } from "@/components/compose/SignatureManager";
 
 export interface ComposeModalProps {
@@ -345,6 +346,9 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
               <div className="mt-4" dangerouslySetInnerHTML={{ __html: quotedBlock }} />
             )}
           </div>
+
+          {/* Real-time tone monitor */}
+          <DraftToneMonitor bodyRef={bodyRef as React.RefObject<HTMLDivElement>} />
 
           {/* AI Draft Panel */}
           {showAiPanel && (
