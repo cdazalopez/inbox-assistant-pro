@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Tasks from "./pages/Tasks";
 import CalendarPage from "./pages/Calendar";
 import AutopilotPage from "./pages/Autopilot";
+import Templates from "./pages/Templates";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -71,6 +72,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DashboardLayout><AutopilotPage /></DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout><Templates /></DashboardLayout>
                 </ProtectedRoute>
               }
             />

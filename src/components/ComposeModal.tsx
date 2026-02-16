@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { useToast } from "@/hooks/use-toast";
+import { useTemplates } from "@/hooks/useTemplates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,11 +20,13 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  FileText,
 } from "lucide-react";
 import RichTextToolbar from "@/components/compose/RichTextToolbar";
 import AIDraftPanel from "@/components/compose/AIDraftPanel";
 import DraftToneMonitor from "@/components/compose/DraftToneMonitor";
 import SignatureManager, { getActiveSignatureHtml } from "@/components/compose/SignatureManager";
+import TemplateSidePanel from "@/components/templates/TemplateSidePanel";
 
 export interface ComposeModalProps {
   open: boolean;
@@ -50,6 +53,9 @@ export interface ComposeModalProps {
   };
   initialCc?: string;
   sentiment?: string;
+  initialSubject?: string;
+  initialBody?: string;
+  emailCategory?: string;
 }
 
 const DRAFT_STORAGE_KEY = "inbox-agent-draft";
@@ -67,9 +73,10 @@ function loadDraft(): { to: string; cc: string; bcc: string; subject: string; bo
   }
 }
 
-export default function ComposeModal({ open, onClose, replyTo, forwardFrom, initialCc, sentiment }: ComposeModalProps) {
+export default function ComposeModal({ open, onClose, replyTo, forwardFrom, initialCc, sentiment, initialSubject, initialBody, emailCategory }: ComposeModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { templates, trackUsage } = useTemplates();
 
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
@@ -80,6 +87,7 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
   const [accountId, setAccountId] = useState<string | null>(null);
   const [fromEmail, setFromEmail] = useState("");
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -131,6 +139,10 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
         setShowCcBcc(!!(draft.cc || draft.bcc));
         if (bodyRef.current) bodyRef.current.innerHTML = draft.body;
         setDraftSaved(true);
+      } else if (initialSubject || initialBody) {
+        setTo("");
+        setSubject(initialSubject ?? "");
+        if (bodyRef.current) bodyRef.current.innerHTML = initialBody ?? "";
       } else {
         setTo("");
         setSubject("");
@@ -145,8 +157,9 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
     setBcc("");
     setShowCcBcc(!!initialCc);
     setShowAiPanel(false);
+    setShowTemplates(false);
     setDraftSaved(false);
-  }, [open, replyTo, forwardFrom, initialCc]);
+  }, [open, replyTo, forwardFrom, initialCc, initialSubject, initialBody]);
 
   // ─── Auto-save draft (new emails only) ───
   const saveDraft = useCallback(() => {
@@ -359,6 +372,21 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
               sentiment={sentiment}
             />
           )}
+
+          {/* Templates Panel */}
+          {showTemplates && (
+            <TemplateSidePanel
+              templates={templates}
+              emailCategory={emailCategory}
+              onUse={(t) => {
+                trackUsage(t.id);
+                setSubject(t.subject_template);
+                if (bodyRef.current) bodyRef.current.innerHTML = t.body_template;
+                setShowTemplates(false);
+              }}
+              onClose={() => setShowTemplates(false)}
+            />
+          )}
         </div>
 
         {/* Bottom toolbar */}
@@ -370,10 +398,17 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
             </Button>
             <Button
               variant={showAiPanel ? "secondary" : "outline"}
-              onClick={() => setShowAiPanel(!showAiPanel)}
+              onClick={() => { setShowAiPanel(!showAiPanel); setShowTemplates(false); }}
             >
               <Sparkles className="h-4 w-4" />
               AI Draft
+            </Button>
+            <Button
+              variant={showTemplates ? "secondary" : "outline"}
+              onClick={() => { setShowTemplates(!showTemplates); setShowAiPanel(false); }}
+            >
+              <FileText className="h-4 w-4" />
+              Templates
             </Button>
             <SignatureManager />
           </div>

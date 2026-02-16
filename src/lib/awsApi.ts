@@ -246,4 +246,58 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to create event');
     return res.json();
   },
+
+  // Templates
+  getTemplates: async (userId: string, category?: string) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (category) params.append('category', category);
+    const res = await fetch(`${API_BASE}/templates?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch templates');
+    const data = await res.json();
+    return data.templates ?? data;
+  },
+
+  createTemplate: async (params: {
+    user_id: string;
+    name: string;
+    category: string;
+    subject_template: string;
+    body_template: string;
+    tone: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to create template');
+    return res.json();
+  },
+
+  updateTemplate: async (params: {
+    template_id: string;
+    user_id: string;
+    name?: string;
+    category?: string;
+    subject_template?: string;
+    body_template?: string;
+    tone?: string;
+    increment_use?: boolean;
+  }) => {
+    const res = await fetch(`${API_BASE}/templates`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to update template');
+    return res.json();
+  },
+
+  deleteTemplate: async (templateId: string, userId: string) => {
+    const res = await fetch(`${API_BASE}/templates?template_id=${templateId}&user_id=${userId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete template');
+    return res.json();
+  },
 };
