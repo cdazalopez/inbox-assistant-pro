@@ -34,7 +34,9 @@ import RiskFlagBadges from "@/components/alerts/RiskFlagBadges";
 import UrgentBanner from "@/components/alerts/UrgentBanner";
 import CalendarContext from "@/components/calendar/CalendarContext";
 import ThreadSummaryPanel from "@/components/inbox/ThreadSummaryPanel";
+import SentimentTrendPanel from "@/components/inbox/SentimentTrendPanel";
 import { normalizeSubject } from "@/services/threadSummaryService";
+import { getSentimentEmoji, analyzeThreadSentiment, getEscalatingThreads } from "@/services/sentimentTrendService";
 import { isMeetingEmail } from "@/components/calendar/types";
 import {
   RefreshCw,
@@ -56,6 +58,7 @@ import {
   CalendarClock,
   Calendar as CalendarIcon,
   MessageSquare,
+  TrendingDown,
 } from "lucide-react";
 
 function safeDate(dateStr: string | null | undefined): Date | null {
@@ -345,6 +348,13 @@ export default function Inbox() {
     return counts;
   }, [emails]);
 
+  // Escalating thread keys
+  const escalatingKeys = useMemo(() => {
+    if (Object.keys(analysesMap).length === 0) return new Set<string>();
+    const escalating = getEscalatingThreads(emails, analysesMap);
+    return new Set(escalating.map((t) => normalizeSubject(t.threadSubject)));
+  }, [emails, analysesMap]);
+
   const inboxSuggestions = useMemo(() => {
     if (emails.length === 0 || Object.keys(analysesMap).length === 0) return [];
     return generateSuggestions({ emails, analysesMap, unreadIds: unreadEmailIds });
@@ -569,6 +579,12 @@ export default function Inbox() {
                         {analysis?.risk_flags && analysis.risk_flags.length > 0 && (
                           <RiskFlagBadges flags={analysis.risk_flags} size="sm" />
                         )}
+                        {escalatingKeys.has(normalizeSubject(email.subject)) && (
+                          <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-red-500/30 bg-red-500/15 px-1.5 py-0 text-[10px] font-medium leading-4 text-red-400">
+                            <TrendingDown className="h-2.5 w-2.5" />
+                            escalating
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
@@ -748,9 +764,15 @@ export default function Inbox() {
                   {(selectedEmail.from_name || selectedEmail.from_address || "?")[0].toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {selectedEmail.from_name || selectedEmail.from_address}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedEmail.from_name || selectedEmail.from_address}
+                    </p>
+                    {currentAnalysis?.sentiment && (() => {
+                      const { emoji, color } = getSentimentEmoji(currentAnalysis.sentiment);
+                      return <span className={`${color} text-sm`} title={`Tone: ${currentAnalysis.sentiment}`}>{emoji}</span>;
+                    })()}
+                  </div>
                   <p className="text-xs text-muted-foreground">{selectedEmail.from_address}</p>
                 </div>
                 <span className="ml-auto text-xs text-muted-foreground">
@@ -782,6 +804,13 @@ export default function Inbox() {
                 allEmails={emails}
               />
 
+              {/* Sentiment Trend */}
+              <SentimentTrendPanel
+                selectedEmail={selectedEmail}
+                allEmails={emails}
+                analysesMap={analysesMap}
+              />
+
               {/* AI Insights */}
               <AIInsightsCard
                 analysis={currentAnalysis}
@@ -804,6 +833,7 @@ export default function Inbox() {
         replyTo={composeReplyTo ?? undefined}
         forwardFrom={composeForwardFrom ?? undefined}
         initialCc={composeInitialCc}
+        sentiment={selectedEmail ? currentAnalysis?.sentiment : undefined}
       />
 
       <TaskModal

@@ -21,6 +21,7 @@ import TasksFollowupsWidget from "@/components/tasks/TasksFollowupsWidget";
 import UpcomingMeetingsWidget from "@/components/calendar/UpcomingMeetingsWidget";
 import EventReminders from "@/components/calendar/EventReminders";
 import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCard";
+import CommunicationHealthCard from "@/components/dashboard/CommunicationHealthCard";
 import { useVoiceBriefing } from "@/hooks/useVoiceBriefing";
 import {
   Mail,
@@ -489,6 +490,8 @@ export default function Dashboard() {
               emailsMap={Object.fromEntries(allEmails.map((e) => [e.id, { subject: e.subject, snippet: e.snippet }]))}
             />
           )}
+          {/* Communication Health */}
+          <CommunicationHealthCard emails={allEmails} analysesMap={analysesMap} />
           {/* Tasks & Follow-ups Widget */}
           <TasksFollowupsWidget />
           {/* Upcoming Meetings Widget */}

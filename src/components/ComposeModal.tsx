@@ -48,6 +48,7 @@ export interface ComposeModalProps {
     has_attachments?: boolean;
   };
   initialCc?: string;
+  sentiment?: string;
 }
 
 const DRAFT_STORAGE_KEY = "inbox-agent-draft";
@@ -65,7 +66,7 @@ function loadDraft(): { to: string; cc: string; bcc: string; subject: string; bo
   }
 }
 
-export default function ComposeModal({ open, onClose, replyTo, forwardFrom, initialCc }: ComposeModalProps) {
+export default function ComposeModal({ open, onClose, replyTo, forwardFrom, initialCc, sentiment }: ComposeModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -351,6 +352,7 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
               replyTo={replyTo}
               onApplyDraft={applyDraft}
               onApplyAndClose={applyDraftAndClose}
+              sentiment={sentiment}
             />
           )}
         </div>
