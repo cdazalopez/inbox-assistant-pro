@@ -19,6 +19,7 @@ import CalendarPage from "./pages/Calendar";
 import AutopilotPage from "./pages/Autopilot";
 import Templates from "./pages/Templates";
 import Contacts from "./pages/Contacts";
+import Analytics from "./pages/Analytics";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 
@@ -89,6 +90,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DashboardLayout><Contacts /></DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout><Analytics /></DashboardLayout>
                 </ProtectedRoute>
               }
             />

@@ -23,6 +23,7 @@ import EventReminders from "@/components/calendar/EventReminders";
 import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCard";
 import CommunicationHealthCard from "@/components/dashboard/CommunicationHealthCard";
 import TopContactsWidget from "@/components/contacts/TopContactsWidget";
+import InboxInsightsCard from "@/components/dashboard/InboxInsightsCard";
 import AutopilotToggle from "@/components/autopilot/AutopilotToggle";
 import AutopilotQueue from "@/components/autopilot/AutopilotQueue";
 import { useAutopilot, isAutoDraftable, AutopilotDraft } from "@/hooks/useAutopilot";
@@ -582,6 +583,8 @@ export default function Dashboard() {
           )}
           {/* Communication Health */}
           <CommunicationHealthCard emails={allEmails} analysesMap={analysesMap} />
+          {/* Inbox Insights Widget */}
+          <InboxInsightsCard />
           {/* Top Contacts Widget */}
           <TopContactsWidget />
           {/* Tasks & Follow-ups Widget */}
