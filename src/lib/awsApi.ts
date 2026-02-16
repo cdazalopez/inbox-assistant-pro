@@ -333,4 +333,60 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to fetch analytics');
     return res.json();
   },
+
+  // Snooze
+  getSnoozedEmails: async (userId: string) => {
+    const res = await fetch(`${API_BASE}/snooze?user_id=${userId}`);
+    if (!res.ok) throw new Error('Failed to fetch snoozed emails');
+    const data = await res.json();
+    return data.snoozed ?? data;
+  },
+
+  getDueSnoozed: async (userId: string) => {
+    const res = await fetch(`${API_BASE}/snooze?user_id=${userId}&include_due=true`);
+    if (!res.ok) throw new Error('Failed to fetch due snoozed');
+    const data = await res.json();
+    return data.snoozed ?? data;
+  },
+
+  snoozeEmail: async (params: {
+    user_id: string;
+    email_id: string;
+    wake_at: string;
+    reason: string;
+    context_note?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/snooze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to snooze email');
+    return res.json();
+  },
+
+  updateSnooze: async (params: {
+    snooze_id: string;
+    user_id: string;
+    wake_at?: string;
+    reason?: string;
+    context_note?: string;
+    status?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/snooze`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to update snooze');
+    return res.json();
+  },
+
+  deleteSnooze: async (snoozeId: string, userId: string) => {
+    const res = await fetch(`${API_BASE}/snooze?snooze_id=${snoozeId}&user_id=${userId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete snooze');
+    return res.json();
+  },
 };
