@@ -40,6 +40,7 @@ import { normalizeSubject } from "@/services/threadSummaryService";
 import { getSentimentEmoji, analyzeThreadSentiment, getEscalatingThreads } from "@/services/sentimentTrendService";
 import { isMeetingEmail } from "@/components/calendar/types";
 import QuickReplyTemplates from "@/components/templates/QuickReplyTemplates";
+import ContactProfilePanel from "@/components/contacts/ContactProfilePanel";
 import {
   RefreshCw,
   Search,
@@ -138,6 +139,7 @@ export default function Inbox() {
   const [taskInitialData, setTaskInitialData] = useState<{ title?: string; description?: string; priority?: string; email_id?: string } | undefined>();
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [followupEmailId, setFollowupEmailId] = useState<string | undefined>();
+  const [showContactProfile, setShowContactProfile] = useState(false);
 
   const limit = 25;
 
@@ -765,14 +767,21 @@ export default function Inbox() {
                 />
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary">
+                <button
+                  onClick={() => setShowContactProfile(!showContactProfile)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary hover:bg-primary/30 transition-colors"
+                  title="View contact profile"
+                >
                   {(selectedEmail.from_name || selectedEmail.from_address || "?")[0].toUpperCase()}
-                </div>
+                </button>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-foreground">
+                    <button
+                      onClick={() => setShowContactProfile(!showContactProfile)}
+                      className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+                    >
                       {selectedEmail.from_name || selectedEmail.from_address}
-                    </p>
+                    </button>
                     {currentAnalysis?.sentiment && (() => {
                       const { emoji, color } = getSentimentEmoji(currentAnalysis.sentiment);
                       return <span className={`${color} text-sm`} title={`Tone: ${currentAnalysis.sentiment}`}>{emoji}</span>;
@@ -784,6 +793,20 @@ export default function Inbox() {
                   {formatFullDate(selectedEmail.received_at)}
                 </span>
               </div>
+
+              {/* Contact Profile Panel */}
+              {showContactProfile && (
+                <ContactProfilePanel
+                  email={selectedEmail.from_address}
+                  name={selectedEmail.from_name}
+                  onClose={() => setShowContactProfile(false)}
+                  onNavigateToEmail={(emailId) => {
+                    const target = emails.find((e) => e.id === emailId);
+                    if (target) handleSelectEmail(target);
+                    setShowContactProfile(false);
+                  }}
+                />
+              )}
 
               {/* Email body */}
               {loadingBody ? (

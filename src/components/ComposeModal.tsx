@@ -27,6 +27,7 @@ import AIDraftPanel from "@/components/compose/AIDraftPanel";
 import DraftToneMonitor from "@/components/compose/DraftToneMonitor";
 import SignatureManager, { getActiveSignatureHtml } from "@/components/compose/SignatureManager";
 import TemplateSidePanel from "@/components/templates/TemplateSidePanel";
+import ContactCompactCard from "@/components/contacts/ContactCompactCard";
 
 export interface ComposeModalProps {
   open: boolean;
@@ -295,6 +296,9 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
               placeholder="recipient@example.com"
               className="h-8 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
             />
+            {to && isValidEmail(to.split(",")[0]?.trim()) && (
+              <ContactCompactCard email={to.split(",")[0].trim()} />
+            )}
             <Button
               variant="ghost"
               size="sm"

@@ -300,4 +300,29 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to delete template');
     return res.json();
   },
+
+  // Contacts
+  getContactsList: async (userId: string, limit = 20) => {
+    const params = new URLSearchParams({ user_id: userId, action: 'list', limit: String(limit) });
+    const res = await fetch(`${API_BASE}/contacts?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch contacts');
+    const data = await res.json();
+    return data.contacts;
+  },
+
+  getContactProfile: async (userId: string, email: string) => {
+    const params = new URLSearchParams({ user_id: userId, action: 'profile', email });
+    const res = await fetch(`${API_BASE}/contacts?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch contact profile');
+    const data = await res.json();
+    return data.profile;
+  },
+
+  getContactHistory: async (userId: string, email: string, limit = 20) => {
+    const params = new URLSearchParams({ user_id: userId, action: 'history', email, limit: String(limit) });
+    const res = await fetch(`${API_BASE}/contacts?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch contact history');
+    const data = await res.json();
+    return data.emails;
+  },
 };
