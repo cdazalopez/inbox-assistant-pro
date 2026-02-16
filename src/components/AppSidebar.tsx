@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutDashboard, Inbox, CheckSquare, FileText, Settings, LogOut, PenSquare, Calendar } from "lucide-react";
+import { LayoutDashboard, Inbox, CheckSquare, FileText, Settings, LogOut, PenSquare, Calendar, Bot } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -21,6 +21,7 @@ import ComposeModal from "@/components/ComposeModal";
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Inbox", url: "/inbox", icon: Inbox },
+  { title: "Autopilot", url: "/autopilot", icon: Bot },
   { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
   { title: "Briefings", url: "/briefings", icon: FileText },
