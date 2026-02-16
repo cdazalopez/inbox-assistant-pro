@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAlertPreferences } from "@/hooks/useAlertPreferences";
 import { User, Link2, Bell, Loader2, ShieldAlert } from "lucide-react";
+import VoiceSettingsCard from "@/components/voice/VoiceSettingsCard";
 
 interface ConnectedAccount {
   id: string;
@@ -263,6 +264,9 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Voice Briefing */}
+      <VoiceSettingsCard />
 
       {/* Notifications */}
       <Card>

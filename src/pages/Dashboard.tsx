@@ -21,6 +21,7 @@ import TasksFollowupsWidget from "@/components/tasks/TasksFollowupsWidget";
 import UpcomingMeetingsWidget from "@/components/calendar/UpcomingMeetingsWidget";
 import EventReminders from "@/components/calendar/EventReminders";
 import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCard";
+import { useVoiceBriefing } from "@/hooks/useVoiceBriefing";
 import {
   Mail,
   MailOpen,
@@ -32,6 +33,7 @@ import {
   Loader2,
   FileText,
   Sparkles,
+  Volume2,
 } from "lucide-react";
 import {
   differenceInMinutes,
@@ -83,6 +85,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { prefs: alertPrefs } = useAlertPreferences();
+  const voice = useVoiceBriefing();
   const toastQueueRef = useRef<string[]>([]);
 
   const [totalCount, setTotalCount] = useState<number | null>(null);
@@ -532,9 +535,27 @@ export default function Dashboard() {
 
           {/* Today's Briefing Widget */}
           <div className="rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-              <FileText className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold text-foreground">Today's Briefing</h2>
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold text-foreground">Today's Briefing</h2>
+              </div>
+              {todayBriefing && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    const content = typeof todayBriefing.content === "string"
+                      ? JSON.parse(todayBriefing.content)
+                      : todayBriefing.content;
+                    voice.play(content, todayBriefing.date);
+                  }}
+                  title="Play briefing"
+                >
+                  <Volume2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
             <div className="px-5 py-4">
               {todayBriefing ? (
