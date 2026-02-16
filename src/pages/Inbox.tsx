@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useLabels } from "@/hooks/useLabels";
 import { useTemplates } from "@/hooks/useTemplates";
 import { awsApi } from "@/lib/awsApi";
+import { supabase } from "@/integrations/supabase/client";
 import { getOrAnalyze } from "@/services/aiAnalysis";
 import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
 import InboxSuggestionBar from "@/components/suggestions/InboxSuggestionBar";
@@ -41,6 +42,9 @@ import { getSentimentEmoji, analyzeThreadSentiment, getEscalatingThreads } from 
 import { isMeetingEmail } from "@/components/calendar/types";
 import QuickReplyTemplates from "@/components/templates/QuickReplyTemplates";
 import ContactProfilePanel from "@/components/contacts/ContactProfilePanel";
+import SnoozeDropdown from "@/components/snooze/SnoozeDropdown";
+import SnoozedWakeUpBanner from "@/components/snooze/SnoozedWakeUpBanner";
+import SnoozedListView from "@/components/snooze/SnoozedListView";
 import {
   RefreshCw,
   Search,
@@ -91,6 +95,7 @@ function formatFullDate(dateStr: string | null | undefined): string {
 export default function Inbox() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const {
     labels,
@@ -107,7 +112,8 @@ export default function Inbox() {
   const [totalEmails, setTotalEmails] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState("inbox");
+  const initialFilter = searchParams.get("filter") || "inbox";
+  const [filter, setFilter] = useState(initialFilter);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -140,6 +146,11 @@ export default function Inbox() {
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [followupEmailId, setFollowupEmailId] = useState<string | undefined>();
   const [showContactProfile, setShowContactProfile] = useState(false);
+
+  // Snooze state
+  const [dueSnoozed, setDueSnoozed] = useState<any[]>([]);
+  const [aiSnoozeContext, setAiSnoozeContext] = useState<string | null>(null);
+  const [loadingAiSnooze, setLoadingAiSnooze] = useState(false);
 
   const limit = 25;
 
@@ -196,8 +207,22 @@ export default function Inbox() {
     fetchAnalyses();
   }, [user?.id, filter, search, fetchEmails, fetchAnalyses, toast]);
 
+  // Fetch due snoozed emails
+  const fetchDueSnoozed = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const due = await awsApi.getDueSnoozed(user.id);
+      setDueSnoozed(Array.isArray(due) ? due : []);
+    } catch {
+      // silently fail
+    }
+  }, [user?.id]);
+
   useEffect(() => {
-    if (user?.id) syncAndLoad();
+    if (user?.id) {
+      syncAndLoad();
+      fetchDueSnoozed();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -285,6 +310,9 @@ export default function Inbox() {
     }).finally(() => setAnalysisLoading(false));
 
     await Promise.all([bodyPromise, analysisPromise]);
+
+    // Fetch AI snooze context in background
+    fetchAiSnoozeContext(email);
   };
 
   // Filter emails by category and label
@@ -391,8 +419,60 @@ export default function Inbox() {
     }
   }, [emails, toast]);
 
+  // Snooze handler
+  const handleSnoozeEmail = useCallback(async (email: Email, wakeAt: string, reason: string, contextNote?: string) => {
+    if (!user?.id) return;
+    try {
+      await awsApi.snoozeEmail({
+        user_id: user.id,
+        email_id: email.id,
+        wake_at: wakeAt,
+        reason,
+        context_note: contextNote,
+      });
+      setEmails((prev) => prev.filter((e) => e.id !== email.id));
+      if (selectedEmail?.id === email.id) setSelectedEmail(null);
+      toast({ title: `⏰ Snoozed until ${format(new Date(wakeAt), "MMM d, h:mm a")}` });
+    } catch {
+      toast({ title: "Failed to snooze", variant: "destructive" });
+    }
+  }, [user?.id, selectedEmail, toast]);
+
+  // Fetch AI context suggestion when selecting an email
+  const fetchAiSnoozeContext = useCallback(async (email: Email) => {
+    setAiSnoozeContext(null);
+    setLoadingAiSnooze(true);
+    try {
+      const { data } = await supabase.functions.invoke("suggest-snooze-context", {
+        body: {
+          subject: email.subject,
+          from_name: email.from_name || email.from_address,
+          snippet: email.snippet,
+        },
+      });
+      setAiSnoozeContext(data?.suggestion || null);
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingAiSnooze(false);
+    }
+  }, []);
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+      {/* Snoozed Wake-Up Banner */}
+      {dueSnoozed.length > 0 && user?.id && (
+        <SnoozedWakeUpBanner
+          dueItems={dueSnoozed}
+          userId={user.id}
+          onDismiss={(snoozeId) => setDueSnoozed((prev) => prev.filter((d) => d.id !== snoozeId))}
+          onOpenEmail={(emailId) => {
+            setFilter("inbox");
+            fetchEmails(1, "inbox", "");
+            fetchDueSnoozed();
+          }}
+        />
+      )}
       {/* Urgent Banner */}
       <UrgentBanner
         analysesMap={analysesMap}
@@ -466,6 +546,7 @@ export default function Inbox() {
             <TabsTrigger value="inbox">All</TabsTrigger>
             <TabsTrigger value="unread">Unread</TabsTrigger>
             <TabsTrigger value="starred">Starred</TabsTrigger>
+            <TabsTrigger value="snoozed">Snoozed</TabsTrigger>
             <TabsTrigger value="archived">Archived</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -485,7 +566,9 @@ export default function Inbox() {
             selectedEmail ? "hidden md:block md:max-w-[50%]" : "w-full"
           }`}
         >
-          {loading ? (
+          {filter === "snoozed" ? (
+            <SnoozedListView />
+          ) : loading ? (
             <div className="space-y-1 p-2">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-lg p-3">
@@ -724,6 +807,16 @@ export default function Inbox() {
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Follow-up</span>
               </Button>
+              <SnoozeDropdown
+                onSnooze={(wakeAt, reason, contextNote) =>
+                  handleSnoozeEmail(selectedEmail, wakeAt, reason, contextNote)
+                }
+                emailSubject={selectedEmail.subject}
+                emailFrom={selectedEmail.from_name}
+                emailSnippet={selectedEmail.snippet}
+                aiContextSuggestion={aiSnoozeContext}
+                loadingAiSuggestion={loadingAiSnooze}
+              />
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
                 <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
               </Button>

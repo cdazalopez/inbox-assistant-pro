@@ -24,6 +24,7 @@ import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCa
 import CommunicationHealthCard from "@/components/dashboard/CommunicationHealthCard";
 import TopContactsWidget from "@/components/contacts/TopContactsWidget";
 import InboxInsightsCard from "@/components/dashboard/InboxInsightsCard";
+import SnoozedDashboardWidget from "@/components/snooze/SnoozedDashboardWidget";
 import AutopilotToggle from "@/components/autopilot/AutopilotToggle";
 import AutopilotQueue from "@/components/autopilot/AutopilotQueue";
 import { useAutopilot, isAutoDraftable, AutopilotDraft } from "@/hooks/useAutopilot";
@@ -585,6 +586,8 @@ export default function Dashboard() {
           <CommunicationHealthCard emails={allEmails} analysesMap={analysesMap} />
           {/* Inbox Insights Widget */}
           <InboxInsightsCard />
+          {/* Snoozed Widget */}
+          <SnoozedDashboardWidget />
           {/* Top Contacts Widget */}
           <TopContactsWidget />
           {/* Tasks & Follow-ups Widget */}

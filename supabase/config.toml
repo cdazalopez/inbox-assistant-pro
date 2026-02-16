@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.summarize-thread]
 verify_jwt = false
+
+[functions.suggest-snooze-context]
+verify_jwt = false
