@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, ReactNode } from "react";
 import { BriefingContent } from "@/services/briefingService";
 import { format } from "date-fns";
 
@@ -164,8 +164,19 @@ export function VoiceBriefingProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const noopPrefs: VoicePreferences = { voiceURI: null, speed: 0.9, autoPlay: false };
+const fallback: VoiceBriefingContextValue = {
+  state: "idle",
+  progress: 0,
+  play: () => {},
+  pause: () => {},
+  resume: () => {},
+  stop: () => {},
+  voicePrefs: noopPrefs,
+  updateVoicePrefs: () => {},
+};
+
 export function useVoiceBriefing() {
   const ctx = useContext(VoiceBriefingContext);
-  if (!ctx) throw new Error("useVoiceBriefing must be used within VoiceBriefingProvider");
-  return ctx;
+  return ctx ?? fallback;
 }
