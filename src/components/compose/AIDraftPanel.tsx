@@ -46,11 +46,13 @@ interface AIDraftPanelProps {
   };
   onApplyDraft: (body: string, subject?: string) => void;
   onApplyAndClose: (body: string, subject?: string) => void;
+  sentiment?: string;
 }
 
-export default function AIDraftPanel({ replyTo, onApplyDraft, onApplyAndClose }: AIDraftPanelProps) {
+export default function AIDraftPanel({ replyTo, onApplyDraft, onApplyAndClose, sentiment }: AIDraftPanelProps) {
   const { toast } = useToast();
-  const [tone, setTone] = useState<DraftTone>("professional");
+  const isNegative = sentiment === "negative" || sentiment === "urgent";
+  const [tone, setTone] = useState<DraftTone>(isNegative ? "empathetic" : "professional");
   const [aiContext, setAiContext] = useState("");
   const [generating, setGenerating] = useState(false);
   const [lastDraft, setLastDraft] = useState<{ body: string; subject?: string } | null>(null);
@@ -86,6 +88,16 @@ export default function AIDraftPanel({ replyTo, onApplyDraft, onApplyAndClose }:
         <Sparkles className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium text-foreground">AI Draft Assistant</span>
       </div>
+
+      {/* Negative sentiment tip */}
+      {isNegative && (
+        <div className="flex items-start gap-2 rounded-md border border-yellow-500/20 bg-yellow-500/5 p-2.5">
+          <span className="text-sm">💡</span>
+          <p className="text-xs text-yellow-300/90">
+            This email has a negative tone. We suggest using an <strong>Empathetic</strong> or <strong>Professional</strong> tone for your reply.
+          </p>
+        </div>
+      )}
 
       {/* Tone selector */}
       <TooltipProvider delayDuration={200}>
