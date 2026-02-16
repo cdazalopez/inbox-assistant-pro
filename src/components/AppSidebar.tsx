@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutDashboard, Inbox, CheckSquare, FileText, Settings, LogOut, PenSquare, Calendar, Bot } from "lucide-react";
+import { LayoutDashboard, Inbox, CheckSquare, FileText, Settings, LogOut, PenSquare, Calendar, Bot, FileType } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -22,8 +22,9 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Inbox", url: "/inbox", icon: Inbox },
   { title: "Autopilot", url: "/autopilot", icon: Bot },
-  { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
+  { title: "Templates", url: "/templates", icon: FileType },
+  { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Briefings", url: "/briefings", icon: FileText },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
