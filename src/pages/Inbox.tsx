@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useLabels } from "@/hooks/useLabels";
+import { useTemplates } from "@/hooks/useTemplates";
 import { awsApi } from "@/lib/awsApi";
 import { getOrAnalyze } from "@/services/aiAnalysis";
 import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
@@ -38,6 +39,7 @@ import SentimentTrendPanel from "@/components/inbox/SentimentTrendPanel";
 import { normalizeSubject } from "@/services/threadSummaryService";
 import { getSentimentEmoji, analyzeThreadSentiment, getEscalatingThreads } from "@/services/sentimentTrendService";
 import { isMeetingEmail } from "@/components/calendar/types";
+import QuickReplyTemplates from "@/components/templates/QuickReplyTemplates";
 import {
   RefreshCw,
   Search,
@@ -98,6 +100,7 @@ export default function Inbox() {
     toggleEmailLabel,
     getLabelsForEmail,
   } = useLabels();
+  const { templates, trackUsage } = useTemplates();
 
   const [emails, setEmails] = useState<Email[]>([]);
   const [totalEmails, setTotalEmails] = useState(0);
@@ -127,6 +130,8 @@ export default function Inbox() {
   const [composeReplyTo, setComposeReplyTo] = useState<any>(null);
   const [composeForwardFrom, setComposeForwardFrom] = useState<any>(null);
   const [composeInitialCc, setComposeInitialCc] = useState("");
+  const [composeInitialBody, setComposeInitialBody] = useState<string | undefined>();
+  const [composeEmailCategory, setComposeEmailCategory] = useState<string | undefined>();
 
   // Task/Followup modal state
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -798,6 +803,32 @@ export default function Inbox() {
                 </div>
               )}
 
+              {/* Quick Reply with Template */}
+              {currentAnalysis?.requires_response && templates.length > 0 && (
+                <QuickReplyTemplates
+                  templates={templates}
+                  emailCategory={currentAnalysis?.category}
+                  onUseTemplate={(t) => {
+                    trackUsage(t.id);
+                    setComposeForwardFrom(null);
+                    setComposeInitialCc("");
+                    setComposeInitialBody(t.body_template);
+                    setComposeEmailCategory(currentAnalysis?.category);
+                    setComposeReplyTo({
+                      id: selectedEmail.id,
+                      nylas_id: selectedEmail.nylas_id,
+                      from_name: selectedEmail.from_name,
+                      from_address: selectedEmail.from_address,
+                      subject: selectedEmail.subject,
+                      snippet: selectedEmail.snippet,
+                      body: emailBody ?? undefined,
+                      received_at: selectedEmail.received_at,
+                    });
+                    setComposeOpen(true);
+                  }}
+                />
+              )}
+
               {/* Thread Summary */}
               <ThreadSummaryPanel
                 selectedEmail={selectedEmail}
@@ -829,11 +860,13 @@ export default function Inbox() {
 
       <ComposeModal
         open={composeOpen}
-        onClose={() => { setComposeOpen(false); setComposeReplyTo(null); setComposeForwardFrom(null); }}
+        onClose={() => { setComposeOpen(false); setComposeReplyTo(null); setComposeForwardFrom(null); setComposeInitialBody(undefined); setComposeEmailCategory(undefined); }}
         replyTo={composeReplyTo ?? undefined}
         forwardFrom={composeForwardFrom ?? undefined}
         initialCc={composeInitialCc}
         sentiment={selectedEmail ? currentAnalysis?.sentiment : undefined}
+        initialBody={composeInitialBody}
+        emailCategory={composeEmailCategory}
       />
 
       <TaskModal

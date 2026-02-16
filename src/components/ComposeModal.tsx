@@ -113,7 +113,7 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
       setSubject(replyTo.subject.startsWith("Re:") ? replyTo.subject : `Re: ${replyTo.subject}`);
       if (bodyRef.current) {
         const sig = getActiveSignatureHtml();
-        bodyRef.current.innerHTML = sig;
+        bodyRef.current.innerHTML = initialBody ? `${initialBody}<br/><br/>${sig}` : sig;
       }
     } else if (forwardFrom) {
       setTo("");
