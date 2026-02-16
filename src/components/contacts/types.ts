@@ -66,24 +66,24 @@ export function getAvatarColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export function getSentimentDotColor(sentiment: string): string {
-  const s = sentiment?.toLowerCase() ?? "";
-  if (s.includes("positive") || s === "positive") return "bg-emerald-400";
-  if (s.includes("negative") || s === "negative") return "bg-red-400";
+export function getSentimentDotColor(sentiment: unknown): string {
+  const s = String(sentiment ?? "").toLowerCase();
+  if (s.includes("positive")) return "bg-emerald-400";
+  if (s.includes("negative")) return "bg-red-400";
   return "bg-muted-foreground/50";
 }
 
-export function getSentimentTrendDirection(sentiments: string[]): "improving" | "stable" | "declining" {
+export function getSentimentTrendDirection(sentiments: unknown[]): "improving" | "stable" | "declining" {
   if (!sentiments || sentiments.length < 2) return "stable";
-  const score = (s: string) => {
-    const l = s?.toLowerCase() ?? "";
+  const score = (s: unknown) => {
+    const l = String(s ?? "").toLowerCase();
     if (l.includes("positive")) return 1;
     if (l.includes("negative")) return -1;
     return 0;
   };
   const half = Math.floor(sentiments.length / 2);
-  const firstHalf = sentiments.slice(0, half).reduce((a, s) => a + score(s), 0) / half;
-  const secondHalf = sentiments.slice(half).reduce((a, s) => a + score(s), 0) / (sentiments.length - half);
+  const firstHalf = sentiments.slice(0, half).reduce<number>((a, s) => a + score(s), 0) / half;
+  const secondHalf = sentiments.slice(half).reduce<number>((a, s) => a + score(s), 0) / (sentiments.length - half);
   const diff = secondHalf - firstHalf;
   if (diff > 0.3) return "improving";
   if (diff < -0.3) return "declining";
