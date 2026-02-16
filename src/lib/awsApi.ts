@@ -325,4 +325,12 @@ export const awsApi = {
     const data = await res.json();
     return data.emails;
   },
+
+  // Analytics
+  getAnalytics: async (userId: string, period = 30) => {
+    const params = new URLSearchParams({ user_id: userId, period: String(period) });
+    const res = await fetch(`${API_BASE}/analytics?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch analytics');
+    return res.json();
+  },
 };
