@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useVoiceBriefing } from "@/hooks/useVoiceBriefing";
 import {
   FileText,
   Loader2,
@@ -17,12 +18,17 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  Volume2,
+  Pause,
+  Square,
+  Play,
 } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Briefings() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const voice = useVoiceBriefing();
   const [todayBriefing, setTodayBriefing] = useState<Briefing | null>(null);
   const [pastBriefings, setPastBriefings] = useState<Briefing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +67,9 @@ export default function Briefings() {
       const briefing = await generateBriefing(user.id);
       setTodayBriefing(briefing);
       toast({ title: "Briefing generated successfully" });
+      if (voice.voicePrefs.autoPlay) {
+        voice.play(briefing.content, briefing.date);
+      }
     } catch (e) {
       toast({
         title: "Failed to generate briefing",
@@ -105,20 +114,50 @@ export default function Briefings() {
             </div>
           </div>
           {todayBriefing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerate}
-              disabled={generating}
-              className="gap-2"
-            >
-              {generating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <div className="flex items-center gap-2">
+              {voice.state === "idle" ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => voice.play(todayBriefing.content, todayBriefing.date)}
+                  className="gap-2"
+                >
+                  <Volume2 className="h-3.5 w-3.5" />
+                  Play Briefing
+                </Button>
               ) : (
-                <Sparkles className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1">
+                  {voice.state === "playing" ? (
+                    <Button variant="outline" size="sm" onClick={voice.pause} className="gap-2">
+                      <Pause className="h-3.5 w-3.5" />
+                      Pause
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={voice.resume} className="gap-2">
+                      <Play className="h-3.5 w-3.5" />
+                      Resume
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={voice.stop}>
+                    <Square className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               )}
-              Regenerate
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerate}
+                disabled={generating}
+                className="gap-2"
+              >
+                {generating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Regenerate
+              </Button>
+            </div>
           )}
         </div>
 

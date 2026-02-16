@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { VoiceBriefingProvider } from "@/hooks/useVoiceBriefing";
+import VoiceMiniPlayer from "@/components/voice/VoiceMiniPlayer";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -26,6 +28,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <VoiceBriefingProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
@@ -80,6 +83,8 @@ const App = () => (
             />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <VoiceMiniPlayer />
+          </VoiceBriefingProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
