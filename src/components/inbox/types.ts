@@ -12,6 +12,7 @@ export interface Email {
   has_attachments: boolean;
   labels?: string[];
   account_email?: string;
+  account_provider?: string;
 }
 
 export interface EmailsResponse {

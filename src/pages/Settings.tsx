@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAlertPreferences } from "@/hooks/useAlertPreferences";
-import { User, Link2, Bell, Loader2, ShieldAlert } from "lucide-react";
+import { User, Link2, Bell, Loader2, ShieldAlert, RefreshCw } from "lucide-react";
 import VoiceSettingsCard from "@/components/voice/VoiceSettingsCard";
 import AutopilotSettingsCard from "@/components/autopilot/AutopilotSettingsCard";
 import { useAutopilot } from "@/hooks/useAutopilot";
@@ -22,6 +22,8 @@ interface ConnectedAccount {
   provider: string;
   sync_status: string;
   created_at?: string;
+  last_sync?: string;
+  email_count?: number;
 }
 
 export default function Settings() {
@@ -33,6 +35,8 @@ export default function Settings() {
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const fetchAccounts = async () => {
     if (!user?.id) return;
@@ -77,6 +81,42 @@ export default function Settings() {
       toast({ title: "Connection failed", description: "Could not reach the server", variant: "destructive" });
     } finally {
       setConnectingProvider(null);
+    }
+  };
+
+  const handleSyncAccount = async (accountId: string) => {
+    if (!user?.id) return;
+    setSyncingAccountId(accountId);
+    try {
+      const result = await awsApi.syncEmails(user.id, accountId);
+      const count = result?.new_emails ?? result?.synced ?? 0;
+      toast({ title: `Synced ${count} new email${count !== 1 ? "s" : ""}` });
+      fetchAccounts();
+    } catch {
+      toast({ title: "Sync failed", variant: "destructive" });
+    } finally {
+      setSyncingAccountId(null);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (!user?.id) return;
+    setSyncingAll(true);
+    try {
+      const result = await awsApi.syncEmails(user.id);
+      const results = result?.results;
+      if (Array.isArray(results)) {
+        const parts = results.map((r: any) => `${r.new_emails ?? 0} new from ${r.provider ?? 'account'}`);
+        toast({ title: `Synced ${accounts.length} accounts: ${parts.join(', ')}` });
+      } else {
+        const count = result?.new_emails ?? result?.synced ?? 0;
+        toast({ title: `Synced ${count} new email${count !== 1 ? "s" : ""}` });
+      }
+      fetchAccounts();
+    } catch {
+      toast({ title: "Sync failed", variant: "destructive" });
+    } finally {
+      setSyncingAll(false);
     }
   };
 
@@ -132,9 +172,22 @@ export default function Settings() {
       {/* Connected Accounts */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Link2 className="h-5 w-5 text-primary" />
-            <CardTitle>Connected Accounts</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary" />
+              <CardTitle>Connected Accounts</CardTitle>
+            </div>
+            {accounts.length > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncAll}
+                disabled={syncingAll}
+              >
+                {syncingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Sync All
+              </Button>
+            )}
           </div>
           <CardDescription>Connect your email accounts to start managing your inbox</CardDescription>
         </CardHeader>
@@ -153,12 +206,36 @@ export default function Settings() {
                   <ProviderIcon provider={account.provider} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{account.email}</p>
-                    {account.created_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Connected {new Date(account.created_at).toLocaleDateString()}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {account.created_at && (
+                        <span>Connected {new Date(account.created_at).toLocaleDateString()}</span>
+                      )}
+                      {account.last_sync && (
+                        <>
+                          <span>·</span>
+                          <span>Last sync: {new Date(account.last_sync).toLocaleString()}</span>
+                        </>
+                      )}
+                      {account.email_count !== undefined && (
+                        <>
+                          <span>·</span>
+                          <span>{account.email_count} emails</span>
+                        </>
+                      )}
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSyncAccount(account.id)}
+                    disabled={syncingAccountId === account.id}
+                  >
+                    {syncingAccountId === account.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
                   <Badge
                     variant={account.sync_status === "active" ? "default" : "secondary"}
                     className={
@@ -174,6 +251,10 @@ export default function Settings() {
             </div>
           ) : null}
 
+          <Separator />
+          <p className="text-sm font-medium text-foreground">
+            {accounts.length > 0 ? "Connect Another Account" : "Connect Your Email"}
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Button
               variant="outline"

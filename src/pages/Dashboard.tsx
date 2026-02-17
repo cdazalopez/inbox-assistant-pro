@@ -376,10 +376,15 @@ export default function Dashboard() {
     setSyncing(true);
     try {
       const res = await awsApi.syncEmails(user.id);
-      const count = res?.new_emails ?? res?.synced ?? 0;
-      toast({ title: `Synced ${count} email${count !== 1 ? "s" : ""}` });
+      const results = res?.results;
+      if (Array.isArray(results) && results.length > 1) {
+        const parts = results.map((r: any) => `${r.new_emails ?? 0} new from ${r.provider ?? 'account'}`);
+        toast({ title: `Synced: ${parts.join(', ')}` });
+      } else {
+        const count = res?.new_emails ?? res?.synced ?? 0;
+        toast({ title: `Synced ${count} email${count !== 1 ? "s" : ""}` });
+      }
       fetchData();
-      // Auto-analyze new emails after sync
       await new Promise(resolve => setTimeout(resolve, 500));
       autoAnalyze();
     } catch {

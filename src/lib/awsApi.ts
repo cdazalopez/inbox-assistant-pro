@@ -26,14 +26,18 @@ export const awsApi = {
     return res.json();
   },
 
-  getEmails: async (userId: string, page = 1, limit = 25, filter = 'inbox', search = '') => {
+  getEmails: async (userId: string, page = 1, limit = 25, filter = 'inbox', search = '', accountId?: string, accountIds?: string[]) => {
     const params = new URLSearchParams({ user_id: userId, page: String(page), limit: String(limit), filter, search });
+    if (accountId) params.append('account_id', accountId);
+    if (accountIds && accountIds.length > 0) params.append('account_ids', accountIds.join(','));
     const res = await fetch(`${API_BASE}/emails?${params}`);
     return res.json();
   },
 
-  syncEmails: async (userId: string) => {
-    const res = await fetch(`${API_BASE}/sync-emails?user_id=${userId}`);
+  syncEmails: async (userId: string, accountId?: string) => {
+    const params = new URLSearchParams({ user_id: userId });
+    if (accountId) params.append('account_id', accountId);
+    const res = await fetch(`${API_BASE}/sync-emails?${params}`);
     return res.json();
   },
 
