@@ -45,6 +45,7 @@ import ContactProfilePanel from "@/components/contacts/ContactProfilePanel";
 import SnoozeDropdown from "@/components/snooze/SnoozeDropdown";
 import SnoozedWakeUpBanner from "@/components/snooze/SnoozedWakeUpBanner";
 import SnoozedListView from "@/components/snooze/SnoozedListView";
+import AccountFilterBar, { AccountIndicator } from "@/components/inbox/AccountFilterBar";
 import {
   RefreshCw,
   Search,
@@ -152,6 +153,10 @@ export default function Inbox() {
   const [aiSnoozeContext, setAiSnoozeContext] = useState<string | null>(null);
   const [loadingAiSnooze, setLoadingAiSnooze] = useState(false);
 
+  // Multi-account state
+  const [accounts, setAccounts] = useState<{ id: string; email: string; provider: string; sync_status: string }[]>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+
   const limit = 25;
 
   // Fetch all analyses for list badges
@@ -178,7 +183,11 @@ export default function Inbox() {
       if (!user?.id) return;
       setLoading(true);
       try {
-        const data: EmailsResponse = await awsApi.getEmails(user.id, p, limit, f, s);
+        const data: EmailsResponse = await awsApi.getEmails(
+          user.id, p, limit, f, s,
+          undefined,
+          selectedAccountIds.length > 0 ? selectedAccountIds : undefined
+        );
         setEmails(data.emails ?? []);
         setTotalEmails(data.total ?? 0);
         setTotalPages(data.total_pages ?? 1);
@@ -188,7 +197,7 @@ export default function Inbox() {
         setLoading(false);
       }
     },
-    [user?.id, page, filter, search, toast]
+    [user?.id, page, filter, search, selectedAccountIds, toast]
   );
 
   const syncAndLoad = useCallback(async () => {
@@ -196,8 +205,14 @@ export default function Inbox() {
     setSyncing(true);
     try {
       const syncResult = await awsApi.syncEmails(user.id);
-      const newCount = syncResult?.new_emails ?? syncResult?.synced ?? 0;
-      toast({ title: `Synced ${newCount} new email${newCount !== 1 ? "s" : ""}` });
+      if (accounts.length > 1) {
+        const results = syncResult?.results ?? [];
+        const parts = results.map((r: any) => `${r.new_emails ?? 0} from ${r.provider ?? 'account'}`);
+        toast({ title: `Synced ${accounts.length} accounts: ${parts.join(', ')}` });
+      } else {
+        const newCount = syncResult?.new_emails ?? syncResult?.synced ?? 0;
+        toast({ title: `Synced ${newCount} new email${newCount !== 1 ? "s" : ""}` });
+      }
     } catch {
       toast({ title: "Sync failed", variant: "destructive" });
     } finally {
@@ -205,7 +220,7 @@ export default function Inbox() {
     }
     fetchEmails(1, filter, search);
     fetchAnalyses();
-  }, [user?.id, filter, search, fetchEmails, fetchAnalyses, toast]);
+  }, [user?.id, accounts, filter, search, fetchEmails, fetchAnalyses, toast]);
 
   // Fetch due snoozed emails
   const fetchDueSnoozed = useCallback(async () => {
@@ -222,6 +237,11 @@ export default function Inbox() {
     if (user?.id) {
       syncAndLoad();
       fetchDueSnoozed();
+      // Fetch accounts for multi-account filter
+      awsApi.getAccounts(user.id).then((data) => {
+        const accs = data?.accounts ?? data;
+        if (Array.isArray(accs)) setAccounts(accs);
+      }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -229,7 +249,7 @@ export default function Inbox() {
   useEffect(() => {
     if (user?.id && !syncing) fetchEmails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filter, search]);
+  }, [page, filter, search, selectedAccountIds]);
 
   const handleSearch = () => {
     setPage(1);
@@ -552,6 +572,13 @@ export default function Inbox() {
         </Tabs>
       </div>
 
+      {/* Account Filter Bar */}
+      <AccountFilterBar
+        selectedAccountIds={selectedAccountIds}
+        onSelectionChange={(ids) => { setSelectedAccountIds(ids); setPage(1); }}
+        accounts={accounts}
+      />
+
       {/* Category filter */}
       <CategoryFilter selected={categoryFilter} onChange={setCategoryFilter} />
 
@@ -624,6 +651,12 @@ export default function Inbox() {
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
+                        {accounts.length > 1 && (
+                          <AccountIndicator
+                            provider={(email as any).account_provider}
+                            email={email.account_email}
+                          />
+                        )}
                         <span
                           className={`truncate text-sm ${
                             !email.is_read ? "font-semibold text-foreground" : "text-foreground/80"
@@ -737,6 +770,7 @@ export default function Inbox() {
                   snippet: selectedEmail.snippet,
                   body: emailBody ?? undefined,
                   received_at: selectedEmail.received_at,
+                  account_email: selectedEmail.account_email,
                 });
                 setComposeOpen(true);
               }}>
@@ -760,6 +794,7 @@ export default function Inbox() {
                     snippet: selectedEmail.snippet,
                     body: emailBody ?? undefined,
                     received_at: selectedEmail.received_at,
+                    account_email: selectedEmail.account_email,
                   });
                   setComposeOpen(true);
                 }}>
@@ -939,6 +974,7 @@ export default function Inbox() {
                       snippet: selectedEmail.snippet,
                       body: emailBody ?? undefined,
                       received_at: selectedEmail.received_at,
+                      account_email: selectedEmail.account_email,
                     });
                     setComposeOpen(true);
                   }}

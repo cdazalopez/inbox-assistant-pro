@@ -22,6 +22,13 @@ import {
   Loader2,
   FileText,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import RichTextToolbar from "@/components/compose/RichTextToolbar";
 import AIDraftPanel from "@/components/compose/AIDraftPanel";
 import DraftToneMonitor from "@/components/compose/DraftToneMonitor";
@@ -41,6 +48,7 @@ export interface ComposeModalProps {
     snippet: string;
     body?: string;
     received_at: string;
+    account_email?: string;
   };
   forwardFrom?: {
     from_name: string;
@@ -87,23 +95,35 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
   const [sending, setSending] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [fromEmail, setFromEmail] = useState("");
+  const [allAccounts, setAllAccounts] = useState<{ id: string; email: string; provider: string }[]>([]);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // ─── Fetch account ───
+  // ─── Fetch accounts ───
   useEffect(() => {
     if (!open || !user?.id) return;
     awsApi.getAccounts(user.id).then((data) => {
       const accounts = data?.accounts ?? data;
       if (Array.isArray(accounts) && accounts.length > 0) {
-        setAccountId(accounts[0].id ?? accounts[0].account_id);
-        setFromEmail(accounts[0].email ?? accounts[0].email_address ?? user.email ?? "");
+        setAllAccounts(accounts.map((a: any) => ({
+          id: a.id ?? a.account_id,
+          email: a.email ?? a.email_address ?? "",
+          provider: a.provider ?? "google",
+        })));
+        // Default: match reply account or first account
+        const replyAccountEmail = replyTo?.account_email;
+        const matchedAccount = replyAccountEmail
+          ? accounts.find((a: any) => (a.email ?? a.email_address) === replyAccountEmail)
+          : null;
+        const defaultAccount = matchedAccount ?? accounts[0];
+        setAccountId(defaultAccount.id ?? defaultAccount.account_id);
+        setFromEmail(defaultAccount.email ?? defaultAccount.email_address ?? user.email ?? "");
       }
     }).catch(() => {});
-  }, [open, user?.id, user?.email]);
+  }, [open, user?.id, user?.email, replyTo?.account_email]);
 
   // ─── Pre-fill for reply / forward / restore draft ───
   useEffect(() => {
@@ -284,7 +304,32 @@ export default function ComposeModal({ open, onClose, replyTo, forwardFrom, init
           {/* From */}
           <div className="flex items-center gap-2 border-b border-border px-4 py-2">
             <span className="w-12 text-xs text-muted-foreground">From</span>
-            <span className="text-sm text-foreground/80">{fromEmail || "Loading..."}</span>
+            {allAccounts.length > 1 ? (
+              <Select
+                value={accountId ?? ""}
+                onValueChange={(val) => {
+                  setAccountId(val);
+                  const acc = allAccounts.find((a) => a.id === val);
+                  if (acc) setFromEmail(acc.email);
+                }}
+              >
+                <SelectTrigger className="h-8 border-0 bg-transparent p-0 text-sm shadow-none focus:ring-0 w-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {allAccounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      <span className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${acc.provider === "google" ? "bg-red-500" : "bg-blue-500"}`} />
+                        {acc.email}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="text-sm text-foreground/80">{fromEmail || "Loading..."}</span>
+            )}
           </div>
 
           {/* To */}
