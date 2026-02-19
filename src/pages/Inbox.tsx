@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -118,6 +118,7 @@ export default function Inbox() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [emailBody, setEmailBody] = useState<string | null>(null);
@@ -178,23 +179,36 @@ export default function Inbox() {
     }
   }, [user?.id]);
 
+  // AbortController ref for cancelling in-flight email fetches
+  const abortRef = useRef<AbortController | null>(null);
+
   const fetchEmails = useCallback(
     async (p = page, f = filter, s = search) => {
       if (!user?.id) return;
+      // Cancel any in-flight request
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setLoading(true);
+      setFetchError(null);
       try {
         const data: EmailsResponse = await awsApi.getEmails(
           user.id, p, limit, f, s,
           undefined,
           selectedAccountIds.length > 0 ? selectedAccountIds : undefined
         );
+        if (controller.signal.aborted) return;
         setEmails(data.emails ?? []);
         setTotalEmails(data.total ?? 0);
         setTotalPages(data.total_pages ?? 1);
-      } catch {
-        toast({ title: "Failed to load emails", variant: "destructive" });
+      } catch (err: any) {
+        if (controller.signal.aborted) return;
+        const msg = err?.message || "Failed to load emails";
+        setFetchError(msg);
+        toast({ title: msg, variant: "destructive" });
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [user?.id, page, filter, search, selectedAccountIds, toast]
@@ -247,7 +261,11 @@ export default function Inbox() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (user?.id && !syncing) fetchEmails();
+    if (user?.id && !syncing) {
+      // Clear stale emails immediately when account selection changes
+      setEmails([]);
+      fetchEmails();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, filter, search, selectedAccountIds]);
 
@@ -609,11 +627,21 @@ export default function Inbox() {
                 </div>
               ))}
             </div>
+          ) : fetchError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <p className="text-destructive text-sm">{fetchError}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchEmails()}>
+                <RefreshCw className="h-4 w-4 mr-1" /> Retry
+              </Button>
+            </div>
           ) : filteredEmails.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-full flex-col items-center justify-center gap-3">
               <p className="text-muted-foreground">
                 {categoryFilter ? `No ${categoryFilter} emails found` : "No emails found"}
               </p>
+              <Button variant="outline" size="sm" onClick={() => fetchEmails()}>
+                <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+              </Button>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -653,7 +681,7 @@ export default function Inbox() {
                       <div className="flex items-center gap-2">
                         {accounts.length > 1 && (
                           <AccountIndicator
-                            provider={(email as any).account_provider}
+                            provider={email.account_provider}
                             email={email.account_email}
                           />
                         )}
