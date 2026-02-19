@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ interface Props {
 
 export default function ContactProfilePanel({ email, name, onClose, onNavigateToEmail }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ContactProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -191,10 +193,10 @@ export default function ContactProfilePanel({ email, name, onClose, onNavigateTo
             </div>
             <div className="space-y-1">
               {profile.recent_emails.slice(0, 5).map((e) => (
-                <button
-                  key={e.id}
-                  onClick={() => onNavigateToEmail?.(e.id)}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-muted/50 transition-colors"
+                  <button
+                    key={e.id}
+                    onClick={() => onNavigateToEmail ? onNavigateToEmail(e.id) : navigate(`/inbox?emailId=${e.id}`)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-muted/50 transition-colors cursor-pointer"
                 >
                   <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${getSentimentDotColor(e.sentiment)}`} />
                   <span className="text-xs text-foreground/80 truncate flex-1">{e.subject}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +36,7 @@ const NEXT_STATUS: Record<string, string> = {
 export default function Tasks() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [followups, setFollowups] = useState<Followup[]>([]);
@@ -239,10 +241,14 @@ export default function Tasks() {
                             </span>
                           )}
                           {task.email_subject && (
-                            <span className="inline-flex items-center gap-1 text-xs text-primary/80 truncate max-w-[200px]">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate(`/inbox?emailId=${task.email_id}`); }}
+                              className="inline-flex items-center gap-1 text-xs text-primary/80 truncate max-w-[200px] hover:text-primary cursor-pointer transition-colors"
+                            >
                               <Mail className="h-3 w-3 shrink-0" />
                               {task.email_subject}
-                            </span>
+                              <span className="text-[10px]">→</span>
+                            </button>
                           )}
                         </div>
                       </div>
@@ -309,10 +315,14 @@ export default function Tasks() {
                           <p className="text-xs text-muted-foreground mt-1">{followup.notes}</p>
                         )}
                         {followup.email_subject && (
-                          <span className="inline-flex items-center gap-1 text-xs text-primary/80 mt-1 truncate max-w-[250px]">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/inbox?emailId=${followup.email_id}`); }}
+                            className="inline-flex items-center gap-1 text-xs text-primary/80 mt-1 truncate max-w-[250px] hover:text-primary cursor-pointer transition-colors"
+                          >
                             <Mail className="h-3 w-3 shrink-0" />
                             {followup.email_subject}
-                          </span>
+                            <span className="text-[10px]">→</span>
+                          </button>
                         )}
                       </div>
                       <div className="flex gap-1 shrink-0">

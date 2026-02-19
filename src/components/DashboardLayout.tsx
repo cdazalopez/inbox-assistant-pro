@@ -17,7 +17,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     try {
       const [analysesRes, emailsRes] = await Promise.all([
         awsApi.getAllAnalyses(user.id),
-        awsApi.getEmails(user.id, 1, 100, "inbox"),
+        awsApi.getEmails(user.id, 1, 200, "inbox"),
       ]);
 
       const analyses: Record<string, EmailAnalysis> =
