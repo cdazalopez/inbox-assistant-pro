@@ -539,7 +539,7 @@ export default function Dashboard() {
       </div>
 
       {/* Smart Cleanup */}
-      <SmartCleanupCard onCleanupDone={fetchData} />
+      <SmartCleanupCard emails={allEmails} analysesMap={analysesMap} isLoading={!mainFetchDone} onCleanupDone={fetchData} />
 
       {/* Main content row */}
       <div className="grid gap-6 lg:grid-cols-3">
