@@ -9,12 +9,38 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAlertPreferences } from "@/hooks/useAlertPreferences";
 import { User, Link2, Bell, Loader2, ShieldAlert, RefreshCw } from "lucide-react";
 import VoiceSettingsCard from "@/components/voice/VoiceSettingsCard";
 import AutopilotSettingsCard from "@/components/autopilot/AutopilotSettingsCard";
 import { useAutopilot } from "@/hooks/useAutopilot";
+
+const SYNC_RANGE_OPTIONS = [
+  { value: "1m", label: "Last 1 Month" },
+  { value: "2m", label: "Last 2 Months" },
+  { value: "3m", label: "Last 3 Months" },
+  { value: "6m", label: "Last 6 Months" },
+  { value: "all", label: "All Time" },
+] as const;
+
+function getSavedRange(accountId: string): string {
+  try {
+    const stored = localStorage.getItem(`sync_range_${accountId}`);
+    return stored || "1m";
+  } catch { return "1m"; }
+}
+
+function saveRange(accountId: string, range: string) {
+  try { localStorage.setItem(`sync_range_${accountId}`, range); } catch {}
+}
 
 interface ConnectedAccount {
   id: string;
@@ -84,13 +110,27 @@ export default function Settings() {
     }
   };
 
+  const [syncRanges, setSyncRanges] = useState<Record<string, string>>({});
+
+  // Initialize sync ranges from localStorage when accounts load
+  useEffect(() => {
+    if (accounts.length > 0) {
+      const ranges: Record<string, string> = {};
+      accounts.forEach((a) => { ranges[a.id] = getSavedRange(a.id); });
+      setSyncRanges(ranges);
+    }
+  }, [accounts]);
+
   const handleSyncAccount = async (accountId: string) => {
     if (!user?.id) return;
     setSyncingAccountId(accountId);
+    const range = syncRanges[accountId] || "1m";
+    const rangeLabel = SYNC_RANGE_OPTIONS.find((o) => o.value === range)?.label || range;
     try {
-      const result = await awsApi.syncEmails(user.id, accountId);
+      toast({ title: `Syncing emails from ${rangeLabel}...` });
+      const result = await awsApi.syncEmails(user.id, accountId, range);
       const count = result?.new_emails ?? result?.synced ?? 0;
-      toast({ title: `Synced ${count} new email${count !== 1 ? "s" : ""}` });
+      toast({ title: `Sync complete — ${count} email${count !== 1 ? "s" : ""} synced` });
       fetchAccounts();
     } catch {
       toast({ title: "Sync failed", variant: "destructive" });
@@ -224,6 +264,24 @@ export default function Settings() {
                       )}
                     </div>
                   </div>
+                  <Select
+                    value={syncRanges[account.id] || "1m"}
+                    onValueChange={(v) => {
+                      setSyncRanges((prev) => ({ ...prev, [account.id]: v }));
+                      saveRange(account.id, v);
+                    }}
+                  >
+                    <SelectTrigger className="w-[140px] shrink-0 text-xs h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SYNC_RANGE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="ghost"
                     size="sm"
