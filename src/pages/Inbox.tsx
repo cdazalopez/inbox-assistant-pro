@@ -113,6 +113,8 @@ export default function Inbox() {
   const [totalEmails, setTotalEmails] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
+  const [offset, setOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const initialFilter = searchParams.get("filter") || "inbox";
   const initialCategory = searchParams.get("category") || null;
   const initialFrom = searchParams.get("from") || "";
@@ -189,14 +191,15 @@ export default function Inbox() {
   const SPECIAL_FILTERS = ["urgent", "requires_response", "needs_response", "negative"];
 
   const fetchEmails = useCallback(
-    async (p = page, f = filter, s = search) => {
+    async (p = page, f = filter, s = search, append = false) => {
       if (!user?.id) return;
       // Cancel any in-flight request
       if (abortRef.current) abortRef.current.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      setLoading(true);
+      if (!append) setLoading(true);
+      else setLoadingMore(true);
       setFetchError(null);
       try {
         // For special filters, fetch all inbox emails and filter client-side
@@ -207,7 +210,11 @@ export default function Inbox() {
           selectedAccountIds.length > 0 ? selectedAccountIds : undefined
         );
         if (controller.signal.aborted) return;
-        setEmails(data.emails ?? []);
+        if (append) {
+          setEmails((prev) => [...prev, ...(data.emails ?? [])]);
+        } else {
+          setEmails(data.emails ?? []);
+        }
         setTotalEmails(data.total ?? 0);
         setTotalPages(data.total_pages ?? 1);
       } catch (err: any) {
@@ -216,7 +223,10 @@ export default function Inbox() {
         setFetchError(msg);
         toast({ title: msg, variant: "destructive" });
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [user?.id, page, filter, search, selectedAccountIds, toast]
@@ -558,7 +568,7 @@ export default function Inbox() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-foreground">Inbox</h1>
           <Badge variant="secondary" className="text-xs">
-            {totalEmails} emails
+            Showing {emails.length} of {totalEmails} emails
           </Badge>
         </div>
         <div className="flex items-center gap-2">
@@ -784,22 +794,22 @@ export default function Inbox() {
             </div>
           )}
 
-          {/* Pagination */}
-          {!loading && totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border px-4 py-3">
-              <span className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+          {/* Load More */}
+          {!loading && emails.length < totalEmails && (
+            <div className="flex items-center justify-center border-t border-border px-4 py-3">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loadingMore}
+                onClick={() => {
+                  const nextPage = page + 1;
+                  setPage(nextPage);
+                  fetchEmails(nextPage, filter, search, true);
+                }}
+              >
+                {loadingMore ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Load More
+              </Button>
             </div>
           )}
         </div>

@@ -394,4 +394,18 @@ export const awsApi = {
     if (!res.ok) throw new Error('Failed to delete snooze');
     return res.json();
   },
+
+  bulkDelete: async (params: {
+    user_id: string;
+    categories: string[];
+    delete_from_provider?: boolean;
+  }) => {
+    const res = await fetch(`${API_BASE}/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to bulk delete');
+    return res.json();
+  },
 };

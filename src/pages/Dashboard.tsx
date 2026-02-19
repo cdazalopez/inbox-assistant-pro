@@ -25,6 +25,7 @@ import CalendarSuggestionsCard from "@/components/calendar/CalendarSuggestionsCa
 import CommunicationHealthCard from "@/components/dashboard/CommunicationHealthCard";
 import TopContactsWidget from "@/components/contacts/TopContactsWidget";
 import InboxInsightsCard from "@/components/dashboard/InboxInsightsCard";
+import SmartCleanupCard from "@/components/dashboard/SmartCleanupCard";
 import SnoozedDashboardWidget from "@/components/snooze/SnoozedDashboardWidget";
 import AutopilotToggle from "@/components/autopilot/AutopilotToggle";
 import AutopilotQueue from "@/components/autopilot/AutopilotQueue";
@@ -536,6 +537,9 @@ export default function Dashboard() {
           onClick={() => navigate("/inbox?filter=urgent")}
         />
       </div>
+
+      {/* Smart Cleanup */}
+      <SmartCleanupCard onCleanupDone={fetchData} />
 
       {/* Main content row */}
       <div className="grid gap-6 lg:grid-cols-3">
