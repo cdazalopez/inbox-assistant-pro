@@ -16,9 +16,10 @@ import {
 import ContactProfilePanel from "@/components/contacts/ContactProfilePanel";
 import {
   ContactListItem,
+  contactDisplayName,
+  contactEmail,
   getInitials,
   getAvatarColor,
-  getSentimentDotColor,
 } from "@/components/contacts/types";
 import { Search, Users, Mail } from "lucide-react";
 import { format } from "date-fns";
@@ -45,14 +46,16 @@ export default function Contacts() {
     let result = contacts;
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (c) => c.name?.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-      );
+      result = result.filter((c) => {
+        const dn = contactDisplayName(c).toLowerCase();
+        const em = contactEmail(c).toLowerCase();
+        return dn.includes(q) || em.includes(q);
+      });
     }
     result = [...result].sort((a, b) => {
       if (sort === "email_count") return b.email_count - a.email_count;
       if (sort === "last_email") return new Date(b.last_email).getTime() - new Date(a.last_email).getTime();
-      return (a.name || a.email).localeCompare(b.name || b.email);
+      return contactDisplayName(a).localeCompare(contactDisplayName(b));
     });
     return result;
   }, [contacts, search, sort]);
@@ -108,20 +111,25 @@ export default function Contacts() {
           <h2 className="text-sm font-semibold text-muted-foreground mb-3">Top Contacts</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {top5.map((c) => {
-              const initials = getInitials(c.name || c.email);
-              const color = getAvatarColor(c.name || c.email);
+              const dn = contactDisplayName(c);
+              const em = contactEmail(c);
+              if (!em) return null;
+              const initials = getInitials(dn);
+              const color = getAvatarColor(dn);
               return (
                 <button
-                  key={c.email}
-                  onClick={() => handleExpand(c.email)}
+                  key={em}
+                  onClick={() => handleExpand(em)}
                   className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-colors hover:bg-muted/30 ${
-                    expandedEmail === c.email ? "border-primary bg-muted/30" : "border-border bg-card"
+                    expandedEmail === em ? "border-primary bg-muted/30" : "border-border bg-card"
                   }`}
                 >
                   <div className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white ${color}`}>
                     {initials}
                   </div>
-                  <p className="text-sm font-medium text-foreground truncate max-w-full">{c.name || c.email.split("@")[0]}</p>
+                  <p className="text-sm font-medium text-foreground truncate max-w-full">
+                    {c.from_name || c.name || (em ? em.split("@")[0] : "Unknown")}
+                  </p>
                   <Badge variant="secondary" className="text-[10px]">
                     <Mail className="h-2.5 w-2.5 mr-0.5" />
                     {c.email_count}
@@ -152,13 +160,16 @@ export default function Contacts() {
             </div>
           ) : (
             filtered.map((c) => {
-              const initials = getInitials(c.name || c.email);
-              const color = getAvatarColor(c.name || c.email);
-              const isExpanded = expandedEmail === c.email;
+              const dn = contactDisplayName(c);
+              const em = contactEmail(c);
+              if (!em) return null;
+              const initials = getInitials(dn);
+              const color = getAvatarColor(dn);
+              const isExpanded = expandedEmail === em;
               return (
-                <div key={c.email}>
+                <div key={em}>
                   <button
-                    onClick={() => handleExpand(c.email)}
+                    onClick={() => handleExpand(em)}
                     className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors hover:bg-muted/30 ${
                       isExpanded ? "border-primary bg-muted/30" : "border-border bg-card"
                     }`}
@@ -167,8 +178,8 @@ export default function Contacts() {
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{c.name || c.email}</p>
-                      <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{dn}</p>
+                      <p className="text-xs text-muted-foreground truncate">{em}</p>
                     </div>
                     <Badge variant="secondary" className="shrink-0 text-xs">
                       {c.email_count} emails
@@ -181,8 +192,8 @@ export default function Contacts() {
                   {isExpanded && (
                     <div className="mt-2 ml-4 md:hidden">
                       <ContactProfilePanel
-                        email={c.email}
-                        name={c.name}
+                        email={em}
+                        name={dn}
                         onClose={() => setExpandedEmail(null)}
                       />
                     </div>
@@ -199,7 +210,7 @@ export default function Contacts() {
             <div className="sticky top-4">
               <ContactProfilePanel
                 email={expandedEmail}
-                name={filtered?.find((c) => c.email === expandedEmail)?.name}
+                name={contactDisplayName(filtered?.find((c) => contactEmail(c) === expandedEmail) || { email_count: 0, last_email: "", first_email: "" })}
                 onClose={() => setExpandedEmail(null)}
               />
             </div>

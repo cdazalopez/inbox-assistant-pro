@@ -1,9 +1,21 @@
 export interface ContactListItem {
-  email: string;
-  name: string;
+  email?: string;
+  from_address?: string;
+  name?: string;
+  from_name?: string;
   email_count: number;
   last_email: string;
   first_email: string;
+}
+
+/** Safely resolve contact display name */
+export function contactDisplayName(c: ContactListItem): string {
+  return c.from_name || c.name || c.from_address || c.email || "Unknown";
+}
+
+/** Safely resolve contact email address */
+export function contactEmail(c: ContactListItem): string {
+  return c.from_address || c.email || "";
 }
 
 export interface ContactProfile {
