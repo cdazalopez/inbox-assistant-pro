@@ -6,6 +6,7 @@ import { useLabels } from "@/hooks/useLabels";
 import { useTemplates } from "@/hooks/useTemplates";
 import { awsApi } from "@/lib/awsApi";
 import { supabase } from "@/integrations/supabase/client";
+import { useInboxStore } from "@/hooks/useInboxStore";
 import { getOrAnalyze } from "@/services/aiAnalysis";
 import { generateSuggestions, SmartSuggestion } from "@/services/smartSuggestions";
 import InboxSuggestionBar from "@/components/suggestions/InboxSuggestionBar";
@@ -109,8 +110,17 @@ export default function Inbox() {
   } = useLabels();
   const { templates, trackUsage } = useTemplates();
 
-  const [emails, setEmails] = useState<Email[]>([]);
-  const [totalEmails, setTotalEmails] = useState(0);
+  const inboxStore = useInboxStore();
+
+  const [emails, setEmailsRaw] = useState<Email[]>(inboxStore.emails);
+  // Wrapper that keeps store in sync
+  const setEmails: React.Dispatch<React.SetStateAction<Email[]>> = useCallback((action) => {
+    setEmailsRaw((prev) => {
+      const next = typeof action === "function" ? action(prev) : action;
+      return next;
+    });
+  }, []);
+  const [totalEmails, setTotalEmails] = useState(inboxStore.total);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [offset, setOffset] = useState(0);
@@ -122,7 +132,7 @@ export default function Inbox() {
   const [filter, setFilter] = useState(initialFilter);
   const [search, setSearch] = useState(initialFrom);
   const [searchInput, setSearchInput] = useState(initialFrom);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(inboxStore.isStale());
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -130,7 +140,7 @@ export default function Inbox() {
   const [loadingBody, setLoadingBody] = useState(false);
 
   // AI analysis state
-  const [analysesMap, setAnalysesMap] = useState<Record<string, EmailAnalysis>>({});
+  const [analysesMap, setAnalysesMap] = useState<Record<string, EmailAnalysis>>(inboxStore.analysesMap);
   const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -164,6 +174,14 @@ export default function Inbox() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
   const limit = 200;
+
+  // Sync local state to store for cross-navigation caching
+  useEffect(() => {
+    if (emails.length > 0) inboxStore.setEmails(emails, totalEmails);
+  }, [emails, totalEmails]);
+  useEffect(() => {
+    if (Object.keys(analysesMap).length > 0) inboxStore.setAnalysesMap(analysesMap);
+  }, [analysesMap]);
 
   // Fetch all analyses for list badges
   const fetchAnalyses = useCallback(async () => {

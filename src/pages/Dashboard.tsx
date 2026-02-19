@@ -106,18 +106,19 @@ export default function Dashboard() {
 
   const dashStore = useDashboardStore();
 
-  const [totalCount, setTotalCount] = useState<number | null>(dashStore.totalEmails);
-  const [unreadCount, setUnreadCount] = useState<number | null>(dashStore.unreadCount);
-  // recentEmails derived from allEmails below — no separate fetch needed
-  const [analysesMap, setAnalysesMap] = useState<Record<string, EmailAnalysis> | null>(null);
+  // Derive from store — single source of truth
+  const totalCount = dashStore.totalEmails;
+  const unreadCount = dashStore.unreadCount;
+  const analysesMap = dashStore.analysesMap;
+  const allEmails = dashStore.allEmails;
+  const mainFetchDone = !dashStore.isLoading && (dashStore.lastFetched !== null || dashStore.fetchFailed);
+
   const [syncing, setSyncing] = useState(false);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
   const [remainingUnanalyzed, setRemainingUnanalyzed] = useState<number>(0);
   const [todayBriefing, setTodayBriefing] = useState<Briefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
-  const [allEmails, setAllEmails] = useState<Email[]>([]);
-  const [mainFetchDone, setMainFetchDone] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [showAutopilotQueue, setShowAutopilotQueue] = useState(false);
   const notifyUrgentEmails = useCallback(
@@ -172,39 +173,7 @@ export default function Dashboard() {
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
-    const [totalRes, unreadRes, analysesRes, allEmailsRes] = await Promise.allSettled([
-      awsApi.getEmails(user.id, 1, 1, "inbox"),
-      awsApi.getEmails(user.id, 1, 1, "unread"),
-      awsApi.getAllAnalyses(user.id),
-      awsApi.getEmails(user.id, 1, 200, "inbox"),
-    ]);
-
-    if (totalRes.status === "fulfilled") {
-      const t = totalRes.value.total ?? 0;
-      if (t > 0) setTotalCount(t);
-    }
-    if (unreadRes.status === "fulfilled") setUnreadCount(unreadRes.value.total ?? 0);
-    if (analysesRes.status === "fulfilled") {
-      const raw = analysesRes.value;
-      if (Array.isArray(raw)) {
-        const map: Record<string, EmailAnalysis> = {};
-        for (const a of raw) {
-          if (a.email_id) map[a.email_id] = a;
-        }
-        setAnalysesMap(map);
-      } else if (raw && typeof raw === "object") {
-        setAnalysesMap(raw as Record<string, EmailAnalysis>);
-      }
-    }
-    if (allEmailsRes.status === "fulfilled") {
-      const emails = allEmailsRes.value.emails ?? [];
-      setAllEmails(emails);
-      setTotalCount((prev) => {
-        if (prev && prev > 0) return prev;
-        return allEmailsRes.value.total ?? emails.length;
-      });
-    }
-    setMainFetchDone(true);
+    await dashStore.fetchStats(user.id, true);
   }, [user?.id]);
 
   useEffect(() => {
@@ -227,11 +196,7 @@ export default function Dashboard() {
     }
   }, [fetchData, user?.id]);
 
-  // Sync local state from store when it updates
-  useEffect(() => {
-    if (dashStore.totalEmails !== null && totalCount === null) setTotalCount(dashStore.totalEmails);
-    if (dashStore.unreadCount !== null && unreadCount === null) setUnreadCount(dashStore.unreadCount);
-  }, [dashStore.totalEmails, dashStore.unreadCount]);
+  // (store is now the single source of truth — no local sync needed)
 
   // Auto-analyze on first load if there are unanalyzed emails
   useEffect(() => {
@@ -385,7 +350,7 @@ export default function Dashboard() {
           if (r.status === "fulfilled") newEntries[batch[idx].id] = r.value;
         });
         notifyUrgentEmails(newEntries, toAnalyze);
-        setAnalysesMap((prev) => ({ ...(prev ?? {}), ...newEntries }));
+        dashStore.fetchStats(user.id, true); // refresh store with new analyses
         setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, toAnalyze.length) }));
       }
 
@@ -456,7 +421,7 @@ export default function Dashboard() {
           if (r.status === "fulfilled") newEntries[batch[idx].id] = r.value;
         });
         notifyUrgentEmails(newEntries, emails);
-        setAnalysesMap((prev) => ({ ...(prev ?? {}), ...newEntries }));
+        dashStore.fetchStats(user.id, true);
         setBatchProgress((prev) => ({ ...prev, done: Math.min(i + batchSize, emails.length) }));
       }
 
@@ -506,6 +471,14 @@ export default function Dashboard() {
 
       {/* Event Reminders */}
       <EventReminders />
+
+      {/* Retrying indicator */}
+      {dashStore.fetchFailed && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Retrying...
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
