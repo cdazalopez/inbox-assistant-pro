@@ -76,20 +76,20 @@ function StatsCard({ icon, label, value, accent, onClick }: StatsCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-colors ${onClick ? "cursor-pointer hover:bg-muted/30" : ""}`}
+      className={`flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors ${onClick ? "cursor-pointer hover:bg-muted/30" : ""}`}
     >
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${accent ?? "bg-primary/10 text-primary"}`}>
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${accent ?? "bg-primary/10 text-primary"}`}>
         {icon}
       </div>
-      <div className="flex-1">
-        <p className="text-sm text-muted-foreground">{label}</p>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
         {value === null ? (
-          <Skeleton className="mt-1 h-7 w-16" />
+          <Skeleton className="mt-0.5 h-5 w-12" />
         ) : (
-          <p className="text-2xl font-bold text-foreground">{value}</p>
+          <p className="text-xl font-bold text-foreground leading-tight">{value}</p>
         )}
       </div>
-      {onClick && <span className="text-muted-foreground text-xs">→</span>}
+      {onClick && <span className="text-muted-foreground text-[10px]">→</span>}
     </div>
   );
 }
@@ -178,7 +178,11 @@ export default function Dashboard() {
       awsApi.getEmails(user.id, 1, 200, "inbox"),
     ]);
 
-    if (totalRes.status === "fulfilled") setTotalCount(totalRes.value.total ?? 0);
+    if (totalRes.status === "fulfilled") {
+      const t = totalRes.value.total ?? 0;
+      // Fallback: if total is 0 but we have emails, use allEmails count
+      if (t > 0) setTotalCount(t);
+    }
     if (unreadRes.status === "fulfilled") setUnreadCount(unreadRes.value.total ?? 0);
     if (recentRes.status === "fulfilled") setRecentEmails(recentRes.value.emails ?? []);
     if (analysesRes.status === "fulfilled") {
@@ -193,7 +197,15 @@ export default function Dashboard() {
         setAnalysesMap(raw as Record<string, EmailAnalysis>);
       }
     }
-    if (allEmailsRes.status === "fulfilled") setAllEmails(allEmailsRes.value.emails ?? []);
+    if (allEmailsRes.status === "fulfilled") {
+      const emails = allEmailsRes.value.emails ?? [];
+      setAllEmails(emails);
+      // Fallback: if totalCount is still 0 or null, use allEmails total or length
+      setTotalCount((prev) => {
+        if (prev && prev > 0) return prev;
+        return allEmailsRes.value.total ?? emails.length;
+      });
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -499,31 +511,31 @@ export default function Dashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatsCard
-          icon={<Mail className="h-5 w-5" />}
+          icon={<Mail className="h-4 w-4" />}
           label="Total Emails"
           value={totalCount}
           onClick={() => navigate("/inbox")}
         />
         <StatsCard
-          icon={<MailOpen className="h-5 w-5" />}
+          icon={<MailOpen className="h-4 w-4" />}
           label="Unread"
           value={unreadCount}
           accent="bg-blue-500/10 text-blue-400"
           onClick={() => navigate("/inbox?filter=unread")}
         />
         <StatsCard
-          icon={<MessageSquareWarning className="h-5 w-5" />}
+          icon={<MessageSquareWarning className="h-4 w-4" />}
           label="Needs Response"
           value={requiresResponseCount}
           accent="bg-yellow-500/10 text-yellow-400"
-          onClick={() => navigate("/inbox?filter=inbox")}
+          onClick={() => navigate("/inbox?filter=requires_response")}
         />
         <StatsCard
-          icon={<AlertTriangle className="h-5 w-5" />}
+          icon={<AlertTriangle className="h-4 w-4" />}
           label="High Urgency"
           value={highUrgencyCount}
           accent="bg-red-500/10 text-red-400"
-          onClick={() => navigate("/inbox?filter=inbox")}
+          onClick={() => navigate("/inbox?filter=urgent")}
         />
       </div>
 
@@ -597,6 +609,133 @@ export default function Dashboard() {
                 );
               })
             )}
+          </div>
+        </div>
+
+        {/* Urgent Emails */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-5 py-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+              Urgent Emails
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/inbox?filter=urgent")} className="text-xs text-muted-foreground">
+              View all →
+            </Button>
+          </div>
+          <div className="divide-y divide-border">
+            {(() => {
+              if (!allEmails.length || !analysesMap) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-xs text-muted-foreground">Loading...</p>
+                  </div>
+                );
+              }
+              const urgentEmails = allEmails
+                .filter((e) => {
+                  const a = analysesMap[e.id];
+                  return a && a.urgency >= 4;
+                })
+                .slice(0, 5);
+              if (urgentEmails.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-xs text-muted-foreground">No urgent emails right now ✅</p>
+                  </div>
+                );
+              }
+              return urgentEmails.map((email) => {
+                const analysis = analysesMap[email.id];
+                return (
+                  <button
+                    key={email.id}
+                    onClick={() => navigate(`/inbox?emailId=${email.id}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/30 cursor-pointer"
+                  >
+                    <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <span className="truncate text-sm font-medium text-foreground block">
+                        {email.from_name || email.from_address}
+                      </span>
+                      <p className="truncate text-xs text-muted-foreground mt-0.5">{email.subject}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-red-500/10 border border-red-500/20 px-1.5 py-0 text-[10px] font-medium text-red-400 leading-4">
+                      urgency {analysis?.urgency}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatRelativeDate(email.received_at)}
+                    </span>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </div>
+
+        {/* Needs Response */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-5 py-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <MessageSquareWarning className="h-3.5 w-3.5 text-yellow-400" />
+              Needs Response
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/inbox?filter=requires_response")} className="text-xs text-muted-foreground">
+              View all →
+            </Button>
+          </div>
+          <div className="divide-y divide-border">
+            {(() => {
+              if (!allEmails.length || !analysesMap) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-xs text-muted-foreground">Loading...</p>
+                  </div>
+                );
+              }
+              const responseEmails = allEmails
+                .filter((e) => {
+                  const a = analysesMap[e.id];
+                  return a && a.requires_response;
+                })
+                .slice(0, 5);
+              if (responseEmails.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-xs text-muted-foreground">You're all caught up! 🎉</p>
+                  </div>
+                );
+              }
+              return responseEmails.map((email) => {
+                const analysis = analysesMap[email.id];
+                const catClass = analysis
+                  ? CATEGORY_COLORS[analysis.category] ?? CATEGORY_COLORS.general
+                  : null;
+                return (
+                  <button
+                    key={email.id}
+                    onClick={() => navigate(`/inbox?emailId=${email.id}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/30 cursor-pointer"
+                  >
+                    <div className="h-2 w-2 rounded-full bg-yellow-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <span className="truncate text-sm font-medium text-foreground block">
+                        {email.from_name || email.from_address}
+                      </span>
+                      <p className="truncate text-xs text-muted-foreground mt-0.5">{email.subject}</p>
+                    </div>
+                    {catClass && (
+                      <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${catClass}`}>
+                        {analysis!.category}
+                      </span>
+                    )}
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatRelativeDate(email.received_at)}
+                    </span>
+                  </button>
+                );
+              });
+            })()}
           </div>
         </div>
 
