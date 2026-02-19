@@ -36,20 +36,39 @@ Respond with this exact JSON structure:
   "confidence": number 0.0 to 1.0
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are a precise JSON-only email analysis engine. Never output markdown or explanations." },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const payload = JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: "You are a precise JSON-only email analysis engine. Never output markdown or explanations." },
+        { role: "user", content: prompt },
+      ],
     });
+
+    let response: Response | null = null;
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: payload,
+        });
+        break; // success, exit retry loop
+      } catch (fetchErr) {
+        console.error(`Attempt ${attempt + 1}/${maxRetries} failed:`, fetchErr);
+        if (attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // backoff 1s, 2s
+        } else {
+          return new Response(JSON.stringify({ error: "AI gateway unreachable after retries. Please try again." }), {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
