@@ -428,6 +428,18 @@ export default function Inbox() {
       setEmails((prev) =>
         prev.map((em) => (em.id === email.id ? { ...em, is_read: true } : em))
       );
+      // Fire-and-forget: auto-complete related tasks via orchestrator
+      if (user?.id) {
+        fetch('https://vr21smw04e.execute-api.us-east-2.amazonaws.com/briefing-orchestrator', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'complete_task_by_email',
+            user_id: user.id,
+            email_id: email.id,
+          }),
+        }).catch((e) => console.log('Task auto-complete failed silently:', e));
+      }
     }
 
     // Fetch body and analysis in parallel

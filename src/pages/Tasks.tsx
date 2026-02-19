@@ -232,8 +232,9 @@ export default function Tasks() {
               {tasks.map((task) => {
                 const StatusIcon = STATUS_ICONS[task.status];
                 const isOverdue = task.due_date && task.status !== "done" && isAfter(today, startOfDay(parseISO(task.due_date)));
+                const isOverdueStatus = (task.status as string) === "overdue";
                 return (
-                  <div key={task.id} ref={initialTaskId === task.id ? highlightRef : undefined} className={`rounded-lg border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}>
+                  <div key={task.id} ref={initialTaskId === task.id ? highlightRef : undefined} className={`rounded-lg border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""} ${isOverdueStatus ? "border-destructive/50 bg-destructive/5" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}>
                     <div className="flex items-start gap-3">
                       <button onClick={() => handleCycleStatus(task)} className="mt-0.5 shrink-0" title={`Status: ${task.status}. Click to cycle.`}>
                         <StatusIcon className={`h-5 w-5 ${task.status === "done" ? "text-emerald-400" : task.status === "in_progress" ? "text-blue-400" : "text-muted-foreground"}`} />
@@ -246,6 +247,16 @@ export default function Tasks() {
                           <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${PRIORITY_COLORS[task.priority]}`}>
                             {task.priority}
                           </span>
+                          {(task.description?.toLowerCase().includes("briefing") || task.description?.startsWith("From:")) && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 px-1.5 py-0 text-[10px] font-medium leading-4">
+                              📋 From Briefing
+                            </span>
+                          )}
+                          {isOverdueStatus && (
+                            <span className="inline-flex items-center rounded-full bg-destructive/20 text-destructive border border-destructive/30 px-1.5 py-0 text-[10px] font-medium leading-4">
+                              Overdue — moved to Follow-ups
+                            </span>
+                          )}
                         </div>
                         {task.description && (
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
