@@ -29,13 +29,16 @@ export async function generateBriefing(userId: string): Promise<Briefing> {
   const emailsRes = await awsApi.getEmails(userId, 1, 100, "inbox");
   const emails = emailsRes?.emails ?? [];
 
-  // 2. Fetch all analyses
+  // 2. Fetch all analyses — API may return { analyses: [...] } or raw array
   const analysesRaw = await awsApi.getAllAnalyses(userId);
+  const analysesList = Array.isArray(analysesRaw)
+    ? analysesRaw
+    : Array.isArray(analysesRaw?.analyses)
+      ? analysesRaw.analyses
+      : [];
   const analysesMap: Record<string, any> = {};
-  if (Array.isArray(analysesRaw)) {
-    for (const a of analysesRaw) {
-      if (a.email_id) analysesMap[a.email_id] = a;
-    }
+  for (const a of analysesList) {
+    if (a.email_id) analysesMap[a.email_id] = a;
   }
 
   // 3. Merge email data with analysis for the prompt
