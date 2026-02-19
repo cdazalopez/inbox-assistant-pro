@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,10 @@ export default function Tasks() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTaskId = searchParams.get("taskId");
+  const initialFollowupId = searchParams.get("followUpId");
+  const highlightRef = useRef<HTMLDivElement>(null);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [followups, setFollowups] = useState<Followup[]>([]);
@@ -81,6 +85,19 @@ export default function Tasks() {
     fetchTasks();
     fetchFollowups();
   }, [fetchTasks, fetchFollowups]);
+
+  // Auto-scroll to highlighted task/followup from URL param
+  useEffect(() => {
+    if (initialFollowupId && !initialTaskId) {
+      setActiveTab("followups");
+    }
+  }, [initialFollowupId, initialTaskId]);
+
+  useEffect(() => {
+    if (highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
 
   const handleSaveTask = async (data: { title: string; description?: string; priority: string; due_date?: string; email_id?: string }) => {
     if (!user?.id) return;
@@ -216,7 +233,7 @@ export default function Tasks() {
                 const StatusIcon = STATUS_ICONS[task.status];
                 const isOverdue = task.due_date && task.status !== "done" && isAfter(today, startOfDay(parseISO(task.due_date)));
                 return (
-                  <div key={task.id} className={`rounded-lg border border-border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""}`}>
+                  <div key={task.id} ref={initialTaskId === task.id ? highlightRef : undefined} className={`rounded-lg border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}>
                     <div className="flex items-start gap-3">
                       <button onClick={() => handleCycleStatus(task)} className="mt-0.5 shrink-0" title={`Status: ${task.status}. Click to cycle.`}>
                         <StatusIcon className={`h-5 w-5 ${task.status === "done" ? "text-emerald-400" : task.status === "in_progress" ? "text-blue-400" : "text-muted-foreground"}`} />
@@ -292,7 +309,7 @@ export default function Tasks() {
               {followups.map((followup) => {
                 const isOverdue = followup.status === "pending" && isAfter(today, startOfDay(parseISO(followup.due_date)));
                 return (
-                  <div key={followup.id} className={`rounded-lg border border-border bg-card p-4 transition-colors ${followup.status === "completed" ? "opacity-60" : ""}`}>
+                  <div key={followup.id} ref={initialFollowupId === followup.id ? highlightRef : undefined} className={`rounded-lg border bg-card p-4 transition-colors ${followup.status === "completed" ? "opacity-60" : ""} ${initialFollowupId === followup.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}>
                     <div className="flex items-start gap-3">
                       <button onClick={() => handleToggleFollowupStatus(followup)} className="mt-0.5 shrink-0">
                         {followup.status === "completed" ? (

@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ContactListItem, getInitials, getAvatarColor } from "./types";
+import { ContactListItem, contactDisplayName, contactEmail, getInitials, getAvatarColor } from "./types";
 import { Users } from "lucide-react";
 import { format } from "date-fns";
 
@@ -46,20 +46,23 @@ export default function TopContactsWidget() {
           </div>
         ) : (
           contacts.map((c) => {
-            const initials = getInitials(c.name || c.email);
-            const color = getAvatarColor(c.name || c.email);
+            const dn = contactDisplayName(c);
+            const em = contactEmail(c);
+            if (!em) return null;
+            const initials = getInitials(dn);
+            const color = getAvatarColor(dn);
             return (
               <button
-                key={c.email}
-                onClick={() => navigate(`/contacts?email=${encodeURIComponent(c.email)}`)}
-                className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-muted/30 transition-colors"
+                key={em}
+                onClick={() => navigate(`/contacts?email=${encodeURIComponent(em)}`)}
+                className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
               >
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white shrink-0 ${color}`}>
                   {initials}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">{c.name || c.email}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{c.email}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{dn}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{em}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs font-medium text-foreground">{c.email_count}</p>
@@ -67,6 +70,7 @@ export default function TopContactsWidget() {
                     {c.last_email ? format(new Date(c.last_email), "MMM d") : ""}
                   </p>
                 </div>
+                <span className="text-muted-foreground text-[10px]">→</span>
               </button>
             );
           })

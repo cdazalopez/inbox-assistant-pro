@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { CalendarEvent } from "@/components/calendar/types";
@@ -103,6 +104,8 @@ function getEventPosition(event: CalendarEvent) {
 export default function CalendarPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const initialEventId = searchParams.get("eventId");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [events, setEvents] = useState<CalendarEvent[] | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -127,6 +130,14 @@ export default function CalendarPage() {
   }, [user?.id]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
+
+  // Auto-select event from URL param
+  useEffect(() => {
+    if (initialEventId && events && events.length > 0 && !selectedEvent) {
+      const target = events.find((e) => e.id === initialEventId);
+      if (target) setSelectedEvent(target);
+    }
+  }, [initialEventId, events]);
 
   const eventsForDay = useCallback(
     (day: Date) => {

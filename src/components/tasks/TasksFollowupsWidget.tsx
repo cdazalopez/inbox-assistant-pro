@@ -32,12 +32,12 @@ export default function TasksFollowupsWidget() {
   const pendingFollowups = followups?.filter(f => f.status === "pending") ?? [];
 
   // Combine upcoming items sorted by due date
-  const upcomingItems: { type: "task" | "followup"; title: string; due: string; priority?: string; ftype?: string }[] = [];
+  const upcomingItems: { type: "task" | "followup"; id: string; title: string; due: string; priority?: string; ftype?: string }[] = [];
   tasks?.filter(t => t.status !== "done" && t.due_date).forEach(t => {
-    upcomingItems.push({ type: "task", title: t.title, due: t.due_date!, priority: t.priority });
+    upcomingItems.push({ type: "task", id: t.id, title: t.title, due: t.due_date!, priority: t.priority });
   });
   followups?.filter(f => f.status === "pending").forEach(f => {
-    upcomingItems.push({ type: "followup", title: f.email_subject ?? FOLLOWUP_TYPE_LABELS[f.type] ?? f.type, due: f.due_date, ftype: f.type });
+    upcomingItems.push({ type: "followup", id: f.id, title: f.email_subject ?? FOLLOWUP_TYPE_LABELS[f.type] ?? f.type, due: f.due_date, ftype: f.type });
   });
   upcomingItems.sort((a, b) => a.due.localeCompare(b.due));
   const top3 = upcomingItems.slice(0, 3);
@@ -90,7 +90,14 @@ export default function TasksFollowupsWidget() {
                 {top3.map((item, i) => {
                   const isOverdue = isAfter(today, startOfDay(parseISO(item.due)));
                   return (
-                    <div key={i} className="flex items-center gap-2 text-xs">
+                    <button
+                      key={i}
+                      onClick={() => {
+                        if (item.type === "task") navigate(`/tasks?taskId=${item.id}`);
+                        else navigate(`/tasks?followUpId=${item.id}`);
+                      }}
+                      className="flex w-full items-center gap-2 text-xs text-left rounded-md px-1 py-0.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                    >
                       <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${
                         item.type === "task" ? PRIORITY_COLORS[item.priority ?? "medium"] : FOLLOWUP_TYPE_COLORS[item.ftype ?? "reply_needed"]
                       }`}>
@@ -100,7 +107,8 @@ export default function TasksFollowupsWidget() {
                       <span className={`shrink-0 ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}>
                         {item.due}
                       </span>
-                    </div>
+                      <span className="text-muted-foreground text-[10px]">→</span>
+                    </button>
                   );
                 })}
               </div>

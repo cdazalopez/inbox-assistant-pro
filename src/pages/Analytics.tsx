@@ -269,14 +269,14 @@ export default function Analytics() {
           label="Requires Response"
           value={data?.overall?.requires_response ?? null}
           accent={data?.overall?.requires_response ? "bg-orange-500/10 text-orange-400" : undefined}
-          onClick={() => navigate("/inbox")}
+          onClick={() => navigate("/inbox?filter=requires_response")}
         />
         <StatCard
           icon={<ShieldAlert className="h-5 w-5" />}
           label="Risk Flags"
           value={totalRiskFlags}
           accent={totalRiskFlags > 0 ? "bg-red-500/10 text-red-400" : undefined}
-          onClick={() => navigate("/inbox")}
+          onClick={() => navigate("/inbox?filter=urgent")}
         />
       </div>
 
