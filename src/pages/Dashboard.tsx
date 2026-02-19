@@ -107,7 +107,7 @@ export default function Dashboard() {
 
   const [totalCount, setTotalCount] = useState<number | null>(dashStore.totalEmails);
   const [unreadCount, setUnreadCount] = useState<number | null>(dashStore.unreadCount);
-  const [recentEmails, setRecentEmails] = useState<Email[] | null>(null);
+  // recentEmails derived from allEmails below — no separate fetch needed
   const [analysesMap, setAnalysesMap] = useState<Record<string, EmailAnalysis> | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
@@ -116,6 +116,7 @@ export default function Dashboard() {
   const [todayBriefing, setTodayBriefing] = useState<Briefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [allEmails, setAllEmails] = useState<Email[]>([]);
+  const [mainFetchDone, setMainFetchDone] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [showAutopilotQueue, setShowAutopilotQueue] = useState(false);
   const notifyUrgentEmails = useCallback(
@@ -170,21 +171,18 @@ export default function Dashboard() {
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
-    const [totalRes, unreadRes, recentRes, analysesRes, allEmailsRes] = await Promise.allSettled([
+    const [totalRes, unreadRes, analysesRes, allEmailsRes] = await Promise.allSettled([
       awsApi.getEmails(user.id, 1, 1, "inbox"),
       awsApi.getEmails(user.id, 1, 1, "unread"),
-      awsApi.getEmails(user.id, 1, 5, "unread"),
       awsApi.getAllAnalyses(user.id),
       awsApi.getEmails(user.id, 1, 200, "inbox"),
     ]);
 
     if (totalRes.status === "fulfilled") {
       const t = totalRes.value.total ?? 0;
-      // Fallback: if total is 0 but we have emails, use allEmails count
       if (t > 0) setTotalCount(t);
     }
     if (unreadRes.status === "fulfilled") setUnreadCount(unreadRes.value.total ?? 0);
-    if (recentRes.status === "fulfilled") setRecentEmails(recentRes.value.emails ?? []);
     if (analysesRes.status === "fulfilled") {
       const raw = analysesRes.value;
       if (Array.isArray(raw)) {
@@ -200,12 +198,12 @@ export default function Dashboard() {
     if (allEmailsRes.status === "fulfilled") {
       const emails = allEmailsRes.value.emails ?? [];
       setAllEmails(emails);
-      // Fallback: if totalCount is still 0 or null, use allEmails total or length
       setTotalCount((prev) => {
         if (prev && prev > 0) return prev;
         return allEmailsRes.value.total ?? emails.length;
       });
     }
+    setMainFetchDone(true);
   }, [user?.id]);
 
   useEffect(() => {
@@ -236,7 +234,7 @@ export default function Dashboard() {
 
   // Auto-analyze on first load if there are unanalyzed emails
   useEffect(() => {
-    if (recentEmails === null || analysesMap === null) return;
+    if (!mainFetchDone || analysesMap === null) return;
     
     const data = async () => {
       if (!user?.id) return;
@@ -550,7 +548,7 @@ export default function Dashboard() {
             </Button>
           </div>
           <div className="divide-y divide-border">
-            {recentEmails === null ? (
+            {!mainFetchDone ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-5 py-3.5">
                   <Skeleton className="h-2 w-2 rounded-full" />
@@ -561,12 +559,16 @@ export default function Dashboard() {
                   <Skeleton className="h-3 w-12" />
                 </div>
               ))
-            ) : recentEmails.length === 0 ? (
-              <div className="flex items-center justify-center py-10">
-                <p className="text-sm text-muted-foreground">No unread emails ✨</p>
-              </div>
-            ) : (
-              recentEmails.map((email) => {
+            ) : (() => {
+              const unreadEmails = allEmails.filter((e) => !e.is_read).slice(0, 5);
+              if (unreadEmails.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-10">
+                    <p className="text-sm text-muted-foreground">No unread emails ✨</p>
+                  </div>
+                );
+              }
+              return unreadEmails.map((email) => {
                 const analysis = analysesMap?.[email.id];
                 const urgencyLevel = analysis ? getUrgencyLevel(analysis.urgency) : null;
                 const urgencyDotClass = urgencyLevel ? URGENCY_DOT_COLORS[urgencyLevel] : null;
@@ -607,8 +609,8 @@ export default function Dashboard() {
                     </span>
                   </button>
                 );
-              })
-            )}
+              });
+            })()}
           </div>
         </div>
 
@@ -625,16 +627,22 @@ export default function Dashboard() {
           </div>
           <div className="divide-y divide-border">
             {(() => {
-              if (!allEmails.length || !analysesMap) {
-                return (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-xs text-muted-foreground">Loading...</p>
+              if (!mainFetchDone) {
+                return Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-3">
+                    <Skeleton className="h-2 w-2 rounded-full" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-3.5 w-28" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                    <Skeleton className="h-3 w-12" />
                   </div>
-                );
+                ));
               }
+              const analysesLocal = analysesMap ?? {};
               const urgentEmails = allEmails
                 .filter((e) => {
-                  const a = analysesMap[e.id];
+                  const a = analysesLocal[e.id];
                   return a && a.urgency >= 4;
                 })
                 .slice(0, 5);
@@ -686,16 +694,22 @@ export default function Dashboard() {
           </div>
           <div className="divide-y divide-border">
             {(() => {
-              if (!allEmails.length || !analysesMap) {
-                return (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-xs text-muted-foreground">Loading...</p>
+              if (!mainFetchDone) {
+                return Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-3">
+                    <Skeleton className="h-2 w-2 rounded-full" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-3.5 w-28" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                    <Skeleton className="h-3 w-12" />
                   </div>
-                );
+                ));
               }
+              const analysesLocal = analysesMap ?? {};
               const responseEmails = allEmails
                 .filter((e) => {
-                  const a = analysesMap[e.id];
+                  const a = analysesLocal[e.id];
                   return a && a.requires_response;
                 })
                 .slice(0, 5);
