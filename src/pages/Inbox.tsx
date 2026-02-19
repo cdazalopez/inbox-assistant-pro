@@ -191,7 +191,7 @@ export default function Inbox() {
   const SPECIAL_FILTERS = ["urgent", "requires_response", "needs_response", "negative"];
 
   const fetchEmails = useCallback(
-    async (p = page, f = filter, s = search, append = false) => {
+    async (p = page, f = filter, s = search, append = false, cat = categoryFilter) => {
       if (!user?.id) return;
       // Cancel any in-flight request
       if (abortRef.current) abortRef.current.abort();
@@ -204,10 +204,12 @@ export default function Inbox() {
       try {
         // For special filters, fetch all inbox emails and filter client-side
         const apiFilter = SPECIAL_FILTERS.includes(f) ? "inbox" : f;
+        console.log('Fetching category:', cat);
         const data: EmailsResponse = await awsApi.getEmails(
           user.id, p, limit, apiFilter, s,
           undefined,
-          selectedAccountIds.length > 0 ? selectedAccountIds : undefined
+          selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
+          cat || undefined
         );
         if (controller.signal.aborted) return;
         if (append) {
@@ -229,7 +231,7 @@ export default function Inbox() {
         }
       }
     },
-    [user?.id, page, filter, search, selectedAccountIds, toast]
+    [user?.id, page, filter, search, selectedAccountIds, categoryFilter, toast]
   );
 
   const syncAndLoad = useCallback(async () => {
@@ -280,21 +282,77 @@ export default function Inbox() {
 
   useEffect(() => {
     if (user?.id && !syncing) {
-      // Clear stale emails immediately when account selection changes
+      // Clear stale emails immediately when account selection or category changes
       setEmails([]);
-      fetchEmails();
+      setOffset(0);
+      setPage(1);
+      fetchEmails(1, filter, search, false, categoryFilter);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filter, search, selectedAccountIds]);
+  }, [page, filter, search, selectedAccountIds, categoryFilter]);
 
-  // Auto-select email from URL param
+  // Auto-select email from URL param — fetch if not in current list
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false);
   useEffect(() => {
-    if (initialEmailId && emails.length > 0 && !selectedEmail) {
-      const target = emails.find((e) => e.id === initialEmailId);
-      if (target) handleSelectEmail(target);
+    if (!initialEmailId || !user?.id) return;
+    if (selectedEmail?.id === initialEmailId) return;
+
+    const target = emails.find((e) => e.id === initialEmailId);
+    if (target) {
+      handleSelectEmail(target);
+      // Scroll to the email in the list
+      setTimeout(() => {
+        const el = document.getElementById(`email-row-${initialEmailId}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      return;
     }
+
+    // Only fetch if not loading and emails have been loaded
+    if (loading) return;
+
+    // Email not in list — fetch it directly
+    setDeepLinkLoading(true);
+    (async () => {
+      try {
+        // Try fetching a larger batch first
+        const data = await awsApi.getEmails(user.id, 1, 200, "inbox");
+        const found = (data.emails ?? []).find((e: Email) => e.id === initialEmailId);
+        if (found) {
+          setEmails((prev) => prev.some((e) => e.id === found.id) ? prev : [found, ...prev]);
+          handleSelectEmail(found);
+          return;
+        }
+        // Try direct email fetch
+        const single = await awsApi.getEmail(initialEmailId);
+        if (single && single.id) {
+          const emailObj: Email = {
+            id: single.id,
+            nylas_id: single.nylas_id || "",
+            subject: single.subject || "",
+            from_name: single.from_name || "",
+            from_address: single.from_address || "",
+            to_addresses: single.to_addresses || [],
+            snippet: single.snippet || "",
+            received_at: single.received_at || "",
+            is_read: single.is_read ?? true,
+            is_starred: single.is_starred ?? false,
+            has_attachments: single.has_attachments ?? false,
+            labels: single.labels,
+            account_email: single.account_email,
+            account_provider: single.account_provider,
+          };
+          setEmails((prev) => [emailObj, ...prev]);
+          handleSelectEmail(emailObj);
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setDeepLinkLoading(false);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialEmailId, emails.length]);
+  }, [initialEmailId, emails.length, loading]);
 
   const handleSearch = () => {
     setPage(1);
@@ -383,9 +441,7 @@ export default function Inbox() {
   // Filter emails by category, label, and special filters (urgent, requires_response, negative)
   const filteredEmails = useMemo(() => {
     let result = emails;
-    if (categoryFilter) {
-      result = result.filter((e) => analysesMap[e.id]?.category === categoryFilter);
-    }
+    // Category filtering is now done server-side via API param — no client-side filter needed
     if (labelFilter) {
       result = result.filter((e) => (emailLabelsMap[e.id] ?? []).includes(labelFilter));
     }
@@ -398,7 +454,7 @@ export default function Inbox() {
       result = result.filter((e) => analysesMap[e.id]?.sentiment === "negative");
     }
     return result;
-  }, [emails, categoryFilter, labelFilter, analysesMap, emailLabelsMap, filter]);
+  }, [emails, labelFilter, analysesMap, emailLabelsMap, filter]);
 
   const handleBatchAnalyze = useCallback(async () => {
     if (!user?.id || batchAnalyzing) return;
@@ -648,7 +704,7 @@ export default function Inbox() {
         >
           {filter === "snoozed" ? (
             <SnoozedListView />
-          ) : loading ? (
+          ) : loading || deepLinkLoading ? (
             <div className="space-y-1 p-2">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-lg p-3">
@@ -690,10 +746,11 @@ export default function Inbox() {
 
                 return (
                   <button
+                    id={`email-row-${email.id}`}
                     key={email.id}
                     onClick={() => handleSelectEmail(email)}
                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
-                      selectedEmail?.id === email.id ? "bg-muted" : ""
+                      selectedEmail?.id === email.id ? "bg-muted border-l-2 border-primary" : ""
                     } ${!email.is_read ? "bg-muted/30" : ""}`}
                   >
                     {/* Urgency dot */}
