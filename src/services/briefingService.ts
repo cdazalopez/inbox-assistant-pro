@@ -69,7 +69,7 @@ export async function generateBriefing(userId: string): Promise<Briefing> {
   const urgentCount = content.stats?.urgent_count ?? 0;
   const pendingCount = content.stats?.requires_response_count ?? 0;
 
-  await awsApi.storeBriefing({
+  const storeResult = await awsApi.storeBriefing({
     user_id: userId,
     date: today,
     type: "morning",
@@ -78,8 +78,21 @@ export async function generateBriefing(userId: string): Promise<Briefing> {
     pending_count: pendingCount,
   });
 
+  // Fire-and-forget: notify orchestrator to create tasks from briefing
+  const briefingId = storeResult?.id ?? `${today}-morning`;
+  fetch('https://vr21smw04e.execute-api.us-east-2.amazonaws.com/briefing-orchestrator', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'create_tasks_from_briefing',
+      user_id: userId,
+      briefing_id: briefingId,
+      content,
+    }),
+  }).catch((e) => console.log('Orchestrator call failed silently:', e));
+
   return {
-    id: `${today}-morning`,
+    id: briefingId,
     date: today,
     type: "morning",
     content,
