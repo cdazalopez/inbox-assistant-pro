@@ -176,6 +176,7 @@ export default function Contacts() {
                     <span className="text-xs text-muted-foreground shrink-0">
                       {c.last_email ? format(new Date(c.last_email), "MMM d, yyyy") : ""}
                     </span>
+                    <span className="text-muted-foreground text-xs shrink-0">→</span>
                   </button>
                   {isExpanded && (
                     <div className="mt-2 ml-4 md:hidden">

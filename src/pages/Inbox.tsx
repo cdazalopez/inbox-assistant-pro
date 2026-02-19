@@ -114,9 +114,12 @@ export default function Inbox() {
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const initialFilter = searchParams.get("filter") || "inbox";
+  const initialCategory = searchParams.get("category") || null;
+  const initialFrom = searchParams.get("from") || "";
+  const initialEmailId = searchParams.get("emailId") || null;
   const [filter, setFilter] = useState(initialFilter);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState(initialFrom);
+  const [searchInput, setSearchInput] = useState(initialFrom);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -129,7 +132,7 @@ export default function Inbox() {
   const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(initialCategory);
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
@@ -158,7 +161,7 @@ export default function Inbox() {
   const [accounts, setAccounts] = useState<{ id: string; email: string; provider: string; sync_status: string }[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
-  const limit = 25;
+  const limit = 200;
 
   // Fetch all analyses for list badges
   const fetchAnalyses = useCallback(async () => {
@@ -268,6 +271,15 @@ export default function Inbox() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, filter, search, selectedAccountIds]);
+
+  // Auto-select email from URL param
+  useEffect(() => {
+    if (initialEmailId && emails.length > 0 && !selectedEmail) {
+      const target = emails.find((e) => e.id === initialEmailId);
+      if (target) handleSelectEmail(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEmailId, emails.length]);
 
   const handleSearch = () => {
     setPage(1);

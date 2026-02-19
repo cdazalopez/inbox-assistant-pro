@@ -92,19 +92,24 @@ function StatCard({
   value,
   sub,
   accent,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number | null;
   sub?: string;
   accent?: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-5">
+    <div
+      onClick={onClick}
+      className={`flex items-center gap-4 rounded-xl border border-border bg-card p-5 ${onClick ? "cursor-pointer hover:bg-muted/30" : ""}`}
+    >
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${accent ?? "bg-primary/10 text-primary"}`}>
         {icon}
       </div>
-      <div>
+      <div className="flex-1">
         <p className="text-sm text-muted-foreground">{label}</p>
         {value === null ? (
           <Skeleton className="mt-1 h-7 w-16" />
@@ -115,6 +120,7 @@ function StatCard({
           </>
         )}
       </div>
+      {onClick && <span className="text-muted-foreground text-xs">→</span>}
     </div>
   );
 }
@@ -249,24 +255,28 @@ export default function Analytics() {
           icon={<Mail className="h-5 w-5" />}
           label="Total Emails"
           value={data?.overall?.total_emails ?? null}
+          onClick={() => navigate("/inbox")}
         />
         <StatCard
           icon={<MailOpen className="h-5 w-5" />}
           label="Unread"
           value={data?.overall?.unread ?? null}
           sub={data?.overall ? `${Math.round((data.overall.unread / Math.max(data.overall.total_emails, 1)) * 100)}% of total` : undefined}
+          onClick={() => navigate("/inbox?filter=unread")}
         />
         <StatCard
           icon={<AlertTriangle className="h-5 w-5" />}
           label="Requires Response"
           value={data?.overall?.requires_response ?? null}
           accent={data?.overall?.requires_response ? "bg-orange-500/10 text-orange-400" : undefined}
+          onClick={() => navigate("/inbox")}
         />
         <StatCard
           icon={<ShieldAlert className="h-5 w-5" />}
           label="Risk Flags"
           value={totalRiskFlags}
           accent={totalRiskFlags > 0 ? "bg-red-500/10 text-red-400" : undefined}
+          onClick={() => navigate("/inbox")}
         />
       </div>
 
@@ -350,6 +360,10 @@ export default function Analytics() {
                   outerRadius={90}
                   innerRadius={50}
                   paddingAngle={2}
+                  onClick={(entry: any) => {
+                    if (entry?.category) navigate(`/inbox?category=${entry.category}`);
+                  }}
+                  className="cursor-pointer"
                 >
                   {data.categories.map((entry) => (
                     <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] ?? "#6b7280"} />
@@ -482,28 +496,29 @@ export default function Analytics() {
             {data?.top_senders?.length ? (
               <div className="space-y-2">
                 {data.top_senders.slice(0, 10).map((sender) => (
-                  <button
-                    key={sender.email}
-                    onClick={() => navigate("/contacts")}
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
-                      {(sender.name || sender.email).slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-foreground truncate">{sender.name || sender.email}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{sender.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 rounded-full bg-primary/20 w-24">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${(sender.count / maxSenderCount) * 100}%` }}
-                        />
+                    <button
+                      key={sender.email}
+                      onClick={() => navigate(`/inbox?from=${encodeURIComponent(sender.email)}`)}
+                      className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                        {(sender.name || sender.email).slice(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-xs font-bold text-foreground w-8 text-right">{sender.count}</span>
-                    </div>
-                  </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-foreground truncate">{sender.name || sender.email}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{sender.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 rounded-full bg-primary/20 w-24">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${(sender.count / maxSenderCount) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-foreground w-8 text-right">{sender.count}</span>
+                        <span className="text-muted-foreground text-[10px]">→</span>
+                      </div>
+                    </button>
                 ))}
               </div>
             ) : (

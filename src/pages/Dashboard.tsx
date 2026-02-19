@@ -69,15 +69,19 @@ interface StatsCardProps {
   label: string;
   value: number | null;
   accent?: string;
+  onClick?: () => void;
 }
 
-function StatsCard({ icon, label, value, accent }: StatsCardProps) {
+function StatsCard({ icon, label, value, accent, onClick }: StatsCardProps) {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-colors">
+    <div
+      onClick={onClick}
+      className={`flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-colors ${onClick ? "cursor-pointer hover:bg-muted/30" : ""}`}
+    >
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${accent ?? "bg-primary/10 text-primary"}`}>
         {icon}
       </div>
-      <div>
+      <div className="flex-1">
         <p className="text-sm text-muted-foreground">{label}</p>
         {value === null ? (
           <Skeleton className="mt-1 h-7 w-16" />
@@ -85,6 +89,7 @@ function StatsCard({ icon, label, value, accent }: StatsCardProps) {
           <p className="text-2xl font-bold text-foreground">{value}</p>
         )}
       </div>
+      {onClick && <span className="text-muted-foreground text-xs">→</span>}
     </div>
   );
 }
@@ -170,7 +175,7 @@ export default function Dashboard() {
       awsApi.getEmails(user.id, 1, 1, "unread"),
       awsApi.getEmails(user.id, 1, 5, "unread"),
       awsApi.getAllAnalyses(user.id),
-      awsApi.getEmails(user.id, 1, 100, "inbox"),
+      awsApi.getEmails(user.id, 1, 200, "inbox"),
     ]);
 
     if (totalRes.status === "fulfilled") setTotalCount(totalRes.value.total ?? 0);
@@ -223,7 +228,7 @@ export default function Dashboard() {
     
     const data = async () => {
       if (!user?.id) return;
-      const allEmails = await awsApi.getEmails(user.id, 1, 100, "inbox");
+      const allEmails = await awsApi.getEmails(user.id, 1, 200, "inbox");
       const emails: Email[] = allEmails.emails ?? [];
       const unanalyzedCount = emails.filter(e => !analysesMap[e.id]).length;
       
@@ -328,7 +333,7 @@ export default function Dashboard() {
     if (!user?.id || batchAnalyzing) return;
     setBatchAnalyzing(true);
     try {
-      const data = await awsApi.getEmails(user.id, 1, 100, "inbox");
+      const data = await awsApi.getEmails(user.id, 1, 200, "inbox");
       const emails: Email[] = data.emails ?? [];
       const existing = analysesMap ?? {};
       const unanalyzed = emails.filter((e) => !existing[e.id]);
@@ -411,7 +416,7 @@ export default function Dashboard() {
     if (!user?.id || batchAnalyzing) return;
     setBatchAnalyzing(true);
     try {
-      const data = await awsApi.getEmails(user.id, 1, 100, "inbox");
+      const data = await awsApi.getEmails(user.id, 1, 200, "inbox");
       const emails: Email[] = data.emails ?? [];
       
       setBatchProgress({ done: 0, total: emails.length });
@@ -497,24 +502,28 @@ export default function Dashboard() {
           icon={<Mail className="h-5 w-5" />}
           label="Total Emails"
           value={totalCount}
+          onClick={() => navigate("/inbox")}
         />
         <StatsCard
           icon={<MailOpen className="h-5 w-5" />}
           label="Unread"
           value={unreadCount}
           accent="bg-blue-500/10 text-blue-400"
+          onClick={() => navigate("/inbox?filter=unread")}
         />
         <StatsCard
           icon={<MessageSquareWarning className="h-5 w-5" />}
           label="Needs Response"
           value={requiresResponseCount}
           accent="bg-yellow-500/10 text-yellow-400"
+          onClick={() => navigate("/inbox?filter=inbox")}
         />
         <StatsCard
           icon={<AlertTriangle className="h-5 w-5" />}
           label="High Urgency"
           value={highUrgencyCount}
           accent="bg-red-500/10 text-red-400"
+          onClick={() => navigate("/inbox?filter=inbox")}
         />
       </div>
 
@@ -556,8 +565,8 @@ export default function Dashboard() {
                 return (
                   <button
                     key={email.id}
-                    onClick={() => navigate("/inbox")}
-                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/30"
+                    onClick={() => navigate(`/inbox?emailId=${email.id}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/30 cursor-pointer"
                   >
                     <div className="flex w-2.5 shrink-0 items-center justify-center">
                       {urgencyDotClass ? (
@@ -637,12 +646,19 @@ export default function Dashboard() {
                   const colors = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.general;
                   const barColor = getCategoryBarColor(category);
                   return (
-                    <div key={category}>
+                    <button
+                      key={category}
+                      onClick={() => navigate(`/inbox?category=${category}`)}
+                      className="block w-full text-left cursor-pointer hover:bg-muted/30 rounded-lg px-1 py-0.5 transition-colors"
+                    >
                       <div className="flex items-center justify-between mb-1">
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium leading-3 ${colors}`}>
                           {category}
                         </span>
-                        <span className="text-xs font-medium text-muted-foreground">{count}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">{count}</span>
+                          <span className="text-muted-foreground text-[10px]">→</span>
+                        </div>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-muted">
                         <div
@@ -650,7 +666,7 @@ export default function Dashboard() {
                           style={{ width: `${(count / maxCategoryCount) * 100}%` }}
                         />
                       </div>
-                    </div>
+                    </button>
                   );
                 })
               )}
