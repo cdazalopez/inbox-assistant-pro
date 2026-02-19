@@ -24,6 +24,7 @@ interface EmailInput {
 export async function analyzeEmail(email: EmailInput): Promise<EmailAnalysis> {
   const { data, error } = await supabase.functions.invoke("analyze-email", {
     body: {
+      email_id: email.id,
       from_name: email.from_name,
       from_address: email.from_address,
       subject: email.subject,

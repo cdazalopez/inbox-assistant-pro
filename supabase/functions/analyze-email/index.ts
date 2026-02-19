@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { from_name, from_address, subject, snippet } = await req.json();
+    const { email_id, from_name, from_address, subject, snippet } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -108,6 +108,30 @@ Respond with this exact JSON structure:
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Save to AWS if email_id was provided
+    if (email_id) {
+      try {
+        await fetch('https://vr21smw04e.execute-api.us-east-2.amazonaws.com/analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email_id: email_id,
+            category: analysis.category,
+            urgency: analysis.urgency,
+            sentiment: analysis.sentiment,
+            requires_response: analysis.requires_response,
+            risk_flags: analysis.risk_flags || [],
+            summary: analysis.summary,
+            suggested_reply: analysis.suggested_reply || '',
+            confidence: analysis.confidence || 0.8
+          })
+        });
+        console.log(`Analysis saved to AWS for email_id: ${email_id}`);
+      } catch (saveErr) {
+        console.error('Failed to save analysis to AWS:', saveErr);
+      }
     }
 
     return new Response(JSON.stringify(analysis), {
