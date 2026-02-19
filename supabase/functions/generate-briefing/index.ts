@@ -6,6 +6,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function buildFallbackBriefing(emails: any[]) {
+  const urgentEmails = emails.filter((e: any) => (e.urgency ?? 0) >= 4);
+  const needsResponse = emails.filter((e: any) => e.requires_response);
+  const categories: Record<string, number> = {};
+  for (const e of emails) {
+    const cat = e.category || "general";
+    categories[cat] = (categories[cat] || 0) + 1;
+  }
+
+  return {
+    summary: `You have ${emails.length} emails. ${urgentEmails.length} are urgent and ${needsResponse.length} need a response.`,
+    highlights: urgentEmails.slice(0, 3).map((e: any) => `${e.from_name || "Unknown"}: ${e.subject || "(No subject)"}`),
+    urgent_items: urgentEmails.map((e: any) => ({
+      subject: e.subject || "(No subject)",
+      from: e.from_name || e.from_address || "Unknown",
+      reason: `Urgency ${e.urgency}/5${e.risk_flags?.length ? " — " + e.risk_flags.join(", ") : ""}`,
+      email_id: e.id || null,
+    })),
+    action_items: needsResponse.slice(0, 5).map((e: any) => `Reply to ${e.from_name || "Unknown"} re: ${e.subject || "(No subject)"}`),
+    stats: {
+      total_new: emails.length,
+      urgent_count: urgentEmails.length,
+      requires_response_count: needsResponse.length,
+      categories,
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,7 +45,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Build email lookup map for enriching Gemini output with email_ids
+    // Build email lookup map for enriching output with email_ids
     const emailLookup: Record<string, string> = {};
     (emails || []).forEach((email: any) => {
       if (email.subject && email.id) {
@@ -61,44 +89,51 @@ Respond with ONLY valid JSON, no markdown, no code fences. Use this exact struct
   }
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a precise JSON-only briefing generator. Never output markdown or explanations.",
+    // Retry up to 3 times with backoff
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
           },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: "You are a precise JSON-only briefing generator. Never output markdown or explanations." },
+              { role: "user", content: prompt },
+            ],
+          }),
+        });
+        if (response.ok) break;
+        console.error(`Attempt ${attempt + 1} failed: ${response.status}`);
+      } catch (fetchErr) {
+        console.error(`Attempt ${attempt + 1} fetch error:`, fetchErr);
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted, please add funds." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
+
+    // If AI gateway is down, return a fallback briefing built from raw data
+    if (!response || !response.ok) {
+      const errorStatus = response?.status;
+      console.error("AI gateway unavailable after retries, using fallback. Last status:", errorStatus);
+
+      if (errorStatus === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (errorStatus === 402) {
+        return new Response(JSON.stringify({ error: "AI credits exhausted, please add funds." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      return new Response(JSON.stringify({ error: "AI briefing generation failed" }), {
-        status: 500,
+      // Return fallback briefing instead of error
+      const fallback = buildFallbackBriefing(emails || []);
+      return new Response(JSON.stringify(fallback), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -112,10 +147,11 @@ Respond with ONLY valid JSON, no markdown, no code fences. Use this exact struct
       briefing = JSON.parse(cleaned);
     } catch {
       console.error("Failed to parse AI response:", content);
-      return new Response(
-        JSON.stringify({ error: "Failed to parse briefing", raw: content }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Fall back instead of erroring
+      const fallback = buildFallbackBriefing(emails || []);
+      return new Response(JSON.stringify(fallback), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Enrich urgent_items with email_ids
@@ -125,7 +161,6 @@ Respond with ONLY valid JSON, no markdown, no code fences. Use this exact struct
         let emailId = emailLookup[subjectKey];
 
         if (!emailId && item.from && item.subject) {
-          // Try from+subject combo
           const fromAddr = item.from.replace(/.*<([^>]+)>.*/, "$1").trim();
           const comboKey = `${fromAddr}::${subjectKey}`;
           emailId = emailLookup[comboKey];
