@@ -76,14 +76,26 @@ export default function CommunicationHealthCard({ emails, analysesMap }: Communi
               </div>
             )}
 
+            {negativeCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => navigate("/inbox?filter=negative")}
+              >
+                View Negative Emails →
+              </Button>
+            )}
+            {escalatingThreads.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               className="w-full text-xs"
-              onClick={() => navigate("/inbox")}
+              onClick={() => navigate("/inbox?filter=urgent")}
             >
-              View in Inbox
+              View Escalating Threads
             </Button>
+            )}
           </div>
         )}
       </div>

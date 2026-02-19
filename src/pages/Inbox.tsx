@@ -185,6 +185,9 @@ export default function Inbox() {
   // AbortController ref for cancelling in-flight email fetches
   const abortRef = useRef<AbortController | null>(null);
 
+  // Special filters that are handled client-side after fetching all inbox emails
+  const SPECIAL_FILTERS = ["urgent", "requires_response", "needs_response", "negative"];
+
   const fetchEmails = useCallback(
     async (p = page, f = filter, s = search) => {
       if (!user?.id) return;
@@ -196,8 +199,10 @@ export default function Inbox() {
       setLoading(true);
       setFetchError(null);
       try {
+        // For special filters, fetch all inbox emails and filter client-side
+        const apiFilter = SPECIAL_FILTERS.includes(f) ? "inbox" : f;
         const data: EmailsResponse = await awsApi.getEmails(
-          user.id, p, limit, f, s,
+          user.id, p, limit, apiFilter, s,
           undefined,
           selectedAccountIds.length > 0 ? selectedAccountIds : undefined
         );
@@ -365,7 +370,7 @@ export default function Inbox() {
     fetchAiSnoozeContext(email);
   };
 
-  // Filter emails by category and label
+  // Filter emails by category, label, and special filters (urgent, requires_response, negative)
   const filteredEmails = useMemo(() => {
     let result = emails;
     if (categoryFilter) {
@@ -374,8 +379,16 @@ export default function Inbox() {
     if (labelFilter) {
       result = result.filter((e) => (emailLabelsMap[e.id] ?? []).includes(labelFilter));
     }
+    // Client-side filtering for special filter values the API may not handle
+    if (filter === "urgent") {
+      result = result.filter((e) => (analysesMap[e.id]?.urgency ?? 0) >= 4);
+    } else if (filter === "requires_response" || filter === "needs_response") {
+      result = result.filter((e) => analysesMap[e.id]?.requires_response === true);
+    } else if (filter === "negative") {
+      result = result.filter((e) => analysesMap[e.id]?.sentiment === "negative");
+    }
     return result;
-  }, [emails, categoryFilter, labelFilter, analysesMap, emailLabelsMap]);
+  }, [emails, categoryFilter, labelFilter, analysesMap, emailLabelsMap, filter]);
 
   const handleBatchAnalyze = useCallback(async () => {
     if (!user?.id || batchAnalyzing) return;

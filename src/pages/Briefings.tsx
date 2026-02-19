@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
 import { generateBriefing, Briefing, BriefingContent } from "@/services/briefingService";
@@ -26,6 +27,7 @@ import {
 import { format } from "date-fns";
 
 export default function Briefings() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const voice = useVoiceBriefing();
@@ -262,6 +264,7 @@ export default function Briefings() {
 }
 
 function BriefingDetail({ content }: { content: BriefingContent }) {
+  const navigate = useNavigate();
   const c =
     typeof content === "string" ? (JSON.parse(content) as BriefingContent) : content;
 
@@ -296,15 +299,25 @@ function BriefingDetail({ content }: { content: BriefingContent }) {
           </div>
           <div className="space-y-1.5">
             {c.urgent_items.map((item, i) => (
-              <div
+              <button
                 key={i}
-                className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5"
+                onClick={() => {
+                  if ((item as any).email_id) {
+                    navigate(`/inbox?emailId=${(item as any).email_id}`);
+                  } else {
+                    navigate(`/inbox?filter=urgent`);
+                  }
+                }}
+                className="w-full rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5 text-left transition-colors hover:bg-red-500/10 cursor-pointer"
               >
-                <p className="text-sm font-medium text-foreground">{item.subject}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">{item.subject}</p>
+                  <span className="text-muted-foreground text-[10px] shrink-0 ml-2">→</span>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   From: {item.from} · {item.reason}
                 </p>
-              </div>
+              </button>
             ))}
           </div>
         </div>
