@@ -17,6 +17,19 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Build email lookup map for enriching Gemini output with email_ids
+    const emailLookup: Record<string, string> = {};
+    (emails || []).forEach((email: any) => {
+      if (email.subject && email.id) {
+        const key = email.subject.trim().toLowerCase();
+        emailLookup[key] = email.id;
+      }
+      if (email.from_address && email.subject && email.id) {
+        const key2 = `${email.from_address}::${email.subject.trim().toLowerCase()}`;
+        emailLookup[key2] = email.id;
+      }
+    });
+
     const emailList = (emails || [])
       .map(
         (e: any, i: number) =>
@@ -103,6 +116,23 @@ Respond with ONLY valid JSON, no markdown, no code fences. Use this exact struct
         JSON.stringify({ error: "Failed to parse briefing", raw: content }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Enrich urgent_items with email_ids
+    if (briefing.urgent_items && Array.isArray(briefing.urgent_items)) {
+      briefing.urgent_items = briefing.urgent_items.map((item: any) => {
+        const subjectKey = (item.subject || "").trim().toLowerCase();
+        let emailId = emailLookup[subjectKey];
+
+        if (!emailId && item.from && item.subject) {
+          // Try from+subject combo
+          const fromAddr = item.from.replace(/.*<([^>]+)>.*/, "$1").trim();
+          const comboKey = `${fromAddr}::${subjectKey}`;
+          emailId = emailLookup[comboKey];
+        }
+
+        return { ...item, email_id: emailId || null };
+      });
     }
 
     return new Response(JSON.stringify(briefing), {

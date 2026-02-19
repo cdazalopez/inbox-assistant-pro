@@ -42,6 +42,7 @@ export async function generateBriefing(userId: string): Promise<Briefing> {
   const enrichedEmails = emails.map((e: any) => {
     const a = analysesMap[e.id] || {};
     return {
+      id: e.id,
       from_name: e.from_name,
       from_address: e.from_address,
       subject: e.subject,
