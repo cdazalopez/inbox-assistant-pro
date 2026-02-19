@@ -34,9 +34,10 @@ export const awsApi = {
     return res.json();
   },
 
-  syncEmails: async (userId: string, accountId?: string) => {
+  syncEmails: async (userId: string, accountId?: string, range?: string) => {
     const params = new URLSearchParams({ user_id: userId });
     if (accountId) params.append('account_id', accountId);
+    if (range) params.append('range', range);
     const res = await fetch(`${API_BASE}/sync-emails?${params}`);
     return res.json();
   },

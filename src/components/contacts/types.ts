@@ -45,20 +45,21 @@ export interface ContactHistoryEmail {
   sentiment: string;
 }
 
-export function getInitials(name: string): string {
-  if (!name) return "?";
+export function getInitials(name: string | null | undefined): string {
+  if (!name || typeof name !== "string") return "?";
   const parts = name.trim().split(/\s+/);
   return parts.length >= 2
-    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    ? ((parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "")).toUpperCase()
     : name.slice(0, 2).toUpperCase();
 }
 
-export function getAvatarColor(name: string): string {
+export function getAvatarColor(name: string | null | undefined): string {
   const colors = [
     "bg-blue-500", "bg-emerald-500", "bg-purple-500", "bg-orange-500",
     "bg-pink-500", "bg-cyan-500", "bg-yellow-500", "bg-red-500",
     "bg-indigo-500", "bg-teal-500",
   ];
+  if (!name || typeof name !== "string") return colors[0];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);

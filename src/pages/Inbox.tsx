@@ -604,11 +604,11 @@ export default function Inbox() {
       <LabelFilter labels={labels} selectedLabelId={labelFilter} onChange={setLabelFilter} />
 
       {/* Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         {/* Email List */}
         <div
-          className={`flex-1 overflow-y-auto border-r border-border ${
-            selectedEmail ? "hidden md:block md:max-w-[50%]" : "w-full"
+          className={`overflow-y-auto border-r border-border ${
+            selectedEmail ? "hidden md:flex md:flex-col w-[380px] shrink-0" : "w-full"
           }`}
         >
           {filter === "snoozed" ? (
@@ -780,8 +780,8 @@ export default function Inbox() {
         </div>
 
         {/* Detail Panel */}
-        {selectedEmail && (
-          <div className="flex flex-1 flex-col overflow-y-auto">
+        {selectedEmail ? (
+          <div className="flex flex-1 flex-col overflow-y-auto min-w-0">
             <div className="flex items-center gap-2 border-b border-border p-4">
               <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedEmail(null)}>
                 <ChevronLeft className="h-4 w-4" />
@@ -1034,6 +1034,10 @@ export default function Inbox() {
                 <CalendarContext />
               )}
             </div>
+          </div>
+        ) : (
+          <div className="hidden md:flex flex-1 items-center justify-center">
+            <p className="text-muted-foreground text-sm">Select an email to read it</p>
           </div>
         )}
       </div>

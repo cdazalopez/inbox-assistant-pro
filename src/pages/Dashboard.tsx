@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useDashboardStore } from "@/hooks/useDashboardStore";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
@@ -97,8 +98,10 @@ export default function Dashboard() {
   const toastQueueRef = useRef<string[]>([]);
   const autopilot = useAutopilot();
 
-  const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const dashStore = useDashboardStore();
+
+  const [totalCount, setTotalCount] = useState<number | null>(dashStore.totalEmails);
+  const [unreadCount, setUnreadCount] = useState<number | null>(dashStore.unreadCount);
   const [recentEmails, setRecentEmails] = useState<Email[] | null>(null);
   const [analysesMap, setAnalysesMap] = useState<Record<string, EmailAnalysis> | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -191,6 +194,8 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData();
     if (user?.id) {
+      // Fetch global stats (uses cache if < 2min old)
+      dashStore.fetchStats(user.id);
       // Fetch account for autopilot sending
       awsApi.getAccounts(user.id).then((data) => {
         const accounts = data?.accounts ?? data;
@@ -205,6 +210,12 @@ export default function Dashboard() {
       }).catch(() => {});
     }
   }, [fetchData, user?.id]);
+
+  // Sync local state from store when it updates
+  useEffect(() => {
+    if (dashStore.totalEmails !== null && totalCount === null) setTotalCount(dashStore.totalEmails);
+    if (dashStore.unreadCount !== null && unreadCount === null) setUnreadCount(dashStore.unreadCount);
+  }, [dashStore.totalEmails, dashStore.unreadCount]);
 
   // Auto-analyze on first load if there are unanalyzed emails
   useEffect(() => {
@@ -385,6 +396,8 @@ export default function Dashboard() {
         toast({ title: `Synced ${count} email${count !== 1 ? "s" : ""}` });
       }
       fetchData();
+      // Force-refresh global store
+      if (user?.id) dashStore.fetchStats(user.id, true);
       await new Promise(resolve => setTimeout(resolve, 500));
       autoAnalyze();
     } catch {
@@ -448,6 +461,11 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Welcome back, {user?.user_metadata?.full_name || "there"}
+            {dashStore.lastFetched && (
+              <span className="ml-2 text-xs text-muted-foreground/60">
+                · Updated {Math.round((Date.now() - dashStore.lastFetched) / 60000)}m ago
+              </span>
+            )}
           </p>
         </div>
         <AutopilotToggle
