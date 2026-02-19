@@ -75,17 +75,39 @@ serve(async (req) => {
 
 ${emailList || "No emails received in the last 24 hours."}
 
-Respond with ONLY valid JSON, no markdown, no code fences. Use this exact structure:
+CRITICAL RULES:
+- Return ONLY valid JSON, no markdown, no code fences, no explanation
+- urgent_items MUST list each urgent email individually where urgency >= 4 OR requires_response = true
+- Each urgent_item needs: subject (exact email subject), from (sender name), reason (why it needs attention)
+- action_items must be specific actionable tasks, minimum 3 items
+- categories must use actual category names from the emails: marketing, personal, billing, legal, internal, vendor, general
+- Never group everything under "general" — break down by real categories
+- If no urgent emails exist return empty array for urgent_items
+
+Use this exact JSON structure:
+
 {
-  "summary": "2-3 sentence overview of the inbox state",
-  "highlights": ["array of key items needing attention"],
-  "urgent_items": [{"subject": "...", "from": "...", "reason": "..."}],
-  "action_items": ["array of things to follow up on"],
+  "summary": "2-3 sentence overview mentioning specific senders and topics",
+  "highlights": ["specific item 1", "specific item 2", "specific item 3"],
+  "urgent_items": [
+    {
+      "subject": "exact subject line",
+      "from": "sender name",
+      "reason": "specific reason this needs attention"
+    }
+  ],
+  "action_items": [
+    "specific action with context"
+  ],
   "stats": {
     "total_new": number,
     "urgent_count": number,
     "requires_response_count": number,
-    "categories": {"category_name": count}
+    "categories": {
+      "marketing": number,
+      "personal": number,
+      "billing": number
+    }
   }
 }`;
 
@@ -100,7 +122,7 @@ Respond with ONLY valid JSON, no markdown, no code fences. Use this exact struct
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
+            model: "google/gemini-2.0-flash-001",
             messages: [
               { role: "system", content: "You are a precise JSON-only briefing generator. Never output markdown or explanations." },
               { role: "user", content: prompt },
