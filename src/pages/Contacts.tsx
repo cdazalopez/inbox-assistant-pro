@@ -6,13 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ContactProfilePanel from "@/components/contacts/ContactProfilePanel";
 import {
   ContactListItem,
@@ -32,13 +26,14 @@ export default function Contacts() {
   const [contacts, setContacts] = useState<ContactListItem[] | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("email_count");
-  const [expandedEmail, setExpandedEmail] = useState<string | null>(
-    searchParams.get("email") || null
-  );
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(searchParams.get("email") || null);
 
   useEffect(() => {
     if (!user?.id) return;
-    awsApi.getContactsList(user.id, 100).then(setContacts).catch(() => setContacts([]));
+    awsApi
+      .getContactsList(user.id, 100)
+      .then(setContacts)
+      .catch(() => setContacts([]));
   }, [user?.id]);
 
   const filtered = useMemo(() => {
@@ -124,7 +119,9 @@ export default function Contacts() {
                     expandedEmail === em ? "border-primary bg-muted/30" : "border-border bg-card"
                   }`}
                 >
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white ${color}`}>
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white ${color}`}
+                  >
                     {initials}
                   </div>
                   <p className="text-sm font-medium text-foreground truncate max-w-full">
@@ -174,7 +171,9 @@ export default function Contacts() {
                       isExpanded ? "border-primary bg-muted/30" : "border-border bg-card"
                     }`}
                   >
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white shrink-0 ${color}`}>
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white shrink-0 ${color}`}
+                    >
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -191,11 +190,7 @@ export default function Contacts() {
                   </button>
                   {isExpanded && (
                     <div className="mt-2 ml-4 md:hidden">
-                      <ContactProfilePanel
-                        email={em}
-                        name={dn}
-                        onClose={() => setExpandedEmail(null)}
-                      />
+                      <ContactProfilePanel key={em} email={em} name={dn} onClose={() => setExpandedEmail(null)} />
                     </div>
                   )}
                 </div>
@@ -209,8 +204,13 @@ export default function Contacts() {
           <div className="hidden md:block w-80 shrink-0">
             <div className="sticky top-4">
               <ContactProfilePanel
+                key={expandedEmail}
                 email={expandedEmail}
-                name={contactDisplayName(filtered?.find((c) => contactEmail(c) === expandedEmail) || { email_count: 0, last_email: "", first_email: "" })}
+                name={
+                  contacts?.find((c) => contactEmail(c) === expandedEmail)
+                    ? contactDisplayName(contacts.find((c) => contactEmail(c) === expandedEmail)!)
+                    : undefined
+                }
                 onClose={() => setExpandedEmail(null)}
               />
             </div>
