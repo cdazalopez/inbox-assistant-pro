@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
@@ -9,22 +10,14 @@ import FollowupModal from "@/components/tasks/FollowupModal";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Mail,
-  Clock,
-  CheckCircle2,
-  Circle,
-  PlayCircle,
-} from "lucide-react";
+import { Plus, Pencil, Trash2, Mail, Clock, CheckCircle2, Circle, PlayCircle, AlertTriangle } from "lucide-react";
 import { isAfter, parseISO, startOfDay, format } from "date-fns";
 
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<string, React.ElementType> = {
   todo: Circle,
   in_progress: PlayCircle,
   done: CheckCircle2,
+  overdue: AlertTriangle,
 };
 
 const NEXT_STATUS: Record<string, string> = {
@@ -99,7 +92,13 @@ export default function Tasks() {
     }
   });
 
-  const handleSaveTask = async (data: { title: string; description?: string; priority: string; due_date?: string; email_id?: string }) => {
+  const handleSaveTask = async (data: {
+    title: string;
+    description?: string;
+    priority: string;
+    due_date?: string;
+    email_id?: string;
+  }) => {
     if (!user?.id) return;
     if (editingTask) {
       await awsApi.updateTask({ task_id: editingTask.id, user_id: user.id, ...data });
@@ -116,7 +115,7 @@ export default function Tasks() {
     if (!user?.id) return;
     try {
       await awsApi.deleteTask(taskId, user.id);
-      setTasks(prev => prev.filter(t => t.id !== taskId));
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
       toast({ title: "Task deleted" });
     } catch {
       toast({ title: "Delete failed", variant: "destructive" });
@@ -128,7 +127,7 @@ export default function Tasks() {
     const newStatus = NEXT_STATUS[task.status];
     try {
       await awsApi.updateTask({ task_id: task.id, user_id: user.id, status: newStatus });
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus as Task["status"] } : t));
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: newStatus as Task["status"] } : t)));
     } catch {
       toast({ title: "Update failed", variant: "destructive" });
     }
@@ -152,7 +151,9 @@ export default function Tasks() {
     const newStatus = followup.status === "pending" ? "completed" : "pending";
     try {
       await awsApi.updateFollowup({ followup_id: followup.id, user_id: user.id, status: newStatus });
-      setFollowups(prev => prev.map(f => f.id === followup.id ? { ...f, status: newStatus as Followup["status"] } : f));
+      setFollowups((prev) =>
+        prev.map((f) => (f.id === followup.id ? { ...f, status: newStatus as Followup["status"] } : f)),
+      );
     } catch {
       toast({ title: "Update failed", variant: "destructive" });
     }
@@ -162,7 +163,7 @@ export default function Tasks() {
     if (!user?.id) return;
     try {
       await awsApi.deleteFollowup(followupId, user.id);
-      setFollowups(prev => prev.filter(f => f.id !== followupId));
+      setFollowups((prev) => prev.filter((f) => f.id !== followupId));
       toast({ title: "Follow-up deleted" });
     } catch {
       toast({ title: "Delete failed", variant: "destructive" });
@@ -178,11 +179,23 @@ export default function Tasks() {
         <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
         <div className="flex gap-2">
           {activeTab === "tasks" ? (
-            <Button size="sm" onClick={() => { setEditingTask(null); setTaskModalOpen(true); }}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingTask(null);
+                setTaskModalOpen(true);
+              }}
+            >
               <Plus className="h-4 w-4" /> New Task
             </Button>
           ) : (
-            <Button size="sm" onClick={() => { setEditingFollowup(null); setFollowupModalOpen(true); }}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingFollowup(null);
+                setFollowupModalOpen(true);
+              }}
+            >
               <Plus className="h-4 w-4" /> New Follow-up
             </Button>
           )}
@@ -200,7 +213,12 @@ export default function Tasks() {
       {activeTab === "tasks" && (
         <>
           {/* Status filter */}
-          <Tabs value={statusFilter} onValueChange={(v) => { setStatusFilter(v); }}>
+          <Tabs
+            value={statusFilter}
+            onValueChange={(v) => {
+              setStatusFilter(v);
+            }}
+          >
             <TabsList>
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="todo">To Do</TabsTrigger>
@@ -223,31 +241,55 @@ export default function Tasks() {
           ) : tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <p className="text-sm">No tasks yet</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => { setEditingTask(null); setTaskModalOpen(true); }}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => {
+                  setEditingTask(null);
+                  setTaskModalOpen(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Create your first task
               </Button>
             </div>
           ) : (
             <div className="space-y-2">
               {tasks.map((task) => {
-                const StatusIcon = STATUS_ICONS[task.status];
-                const isOverdue = task.due_date && task.status !== "done" && isAfter(today, startOfDay(parseISO(task.due_date)));
+                const StatusIcon = STATUS_ICONS[task.status] ?? Circle;
+                const isOverdue =
+                  task.due_date && task.status !== "done" && isAfter(today, startOfDay(parseISO(task.due_date)));
                 const isOverdueStatus = (task.status as string) === "overdue";
                 return (
-                  <div key={task.id} ref={initialTaskId === task.id ? highlightRef : undefined} className={`rounded-lg border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""} ${isOverdueStatus ? "border-destructive/50 bg-destructive/5" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}>
+                  <div
+                    key={task.id}
+                    ref={initialTaskId === task.id ? highlightRef : undefined}
+                    className={`rounded-lg border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""} ${isOverdueStatus ? "border-destructive/50 bg-destructive/5" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}
+                  >
                     <div className="flex items-start gap-3">
-                      <button onClick={() => handleCycleStatus(task)} className="mt-0.5 shrink-0" title={`Status: ${task.status}. Click to cycle.`}>
-                        <StatusIcon className={`h-5 w-5 ${task.status === "done" ? "text-emerald-400" : task.status === "in_progress" ? "text-blue-400" : "text-muted-foreground"}`} />
+                      <button
+                        onClick={() => handleCycleStatus(task)}
+                        className="mt-0.5 shrink-0"
+                        title={`Status: ${task.status}. Click to cycle.`}
+                      >
+                        <StatusIcon
+                          className={`h-5 w-5 ${task.status === "done" ? "text-emerald-400" : task.status === "in_progress" ? "text-blue-400" : "text-muted-foreground"}`}
+                        />
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-medium text-sm ${task.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                          <span
+                            className={`font-medium text-sm ${task.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}
+                          >
                             {task.title}
                           </span>
-                          <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${PRIORITY_COLORS[task.priority]}`}>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${PRIORITY_COLORS[task.priority]}`}
+                          >
                             {task.priority}
                           </span>
-                          {(task.description?.toLowerCase().includes("briefing") || task.description?.startsWith("From:")) && (
+                          {(task.description?.toLowerCase().includes("briefing") ||
+                            task.description?.startsWith("From:")) && (
                             <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 px-1.5 py-0 text-[10px] font-medium leading-4">
                               📋 From Briefing
                             </span>
@@ -263,14 +305,20 @@ export default function Tasks() {
                         )}
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
                           {task.due_date && (
-                            <span className={`inline-flex items-center gap-1 text-xs ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}>
+                            <span
+                              className={`inline-flex items-center gap-1 text-xs ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}
+                            >
                               <Clock className="h-3 w-3" />
-                              {isOverdue ? "Overdue: " : ""}{format(parseISO(task.due_date), "MMM d, yyyy")}
+                              {isOverdue ? "Overdue: " : ""}
+                              {format(parseISO(task.due_date), "MMM d, yyyy")}
                             </span>
                           )}
                           {task.email_subject && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); navigate(`/inbox?emailId=${task.email_id}`); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/inbox?emailId=${task.email_id}`);
+                              }}
                               className="inline-flex items-center gap-1 text-xs text-primary/80 truncate max-w-[200px] hover:text-primary cursor-pointer transition-colors"
                             >
                               <Mail className="h-3 w-3 shrink-0" />
@@ -281,10 +329,23 @@ export default function Tasks() {
                         </div>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingTask(task); setTaskModalOpen(true); }}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setEditingTask(task);
+                            setTaskModalOpen(true);
+                          }}
+                        >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteTask(task.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleDeleteTask(task.id)}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -311,16 +372,29 @@ export default function Tasks() {
           ) : followups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <p className="text-sm">No follow-ups yet</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => { setEditingFollowup(null); setFollowupModalOpen(true); }}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => {
+                  setEditingFollowup(null);
+                  setFollowupModalOpen(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Create your first follow-up
               </Button>
             </div>
           ) : (
             <div className="space-y-2">
               {followups.map((followup) => {
-                const isOverdue = followup.status === "pending" && isAfter(today, startOfDay(parseISO(followup.due_date)));
+                const isOverdue =
+                  followup.status === "pending" && isAfter(today, startOfDay(parseISO(followup.due_date)));
                 return (
-                  <div key={followup.id} ref={initialFollowupId === followup.id ? highlightRef : undefined} className={`rounded-lg border bg-card p-4 transition-colors ${followup.status === "completed" ? "opacity-60" : ""} ${initialFollowupId === followup.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}>
+                  <div
+                    key={followup.id}
+                    ref={initialFollowupId === followup.id ? highlightRef : undefined}
+                    className={`rounded-lg border bg-card p-4 transition-colors ${followup.status === "completed" ? "opacity-60" : ""} ${initialFollowupId === followup.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}
+                  >
                     <div className="flex items-start gap-3">
                       <button onClick={() => handleToggleFollowupStatus(followup)} className="mt-0.5 shrink-0">
                         {followup.status === "completed" ? (
@@ -331,20 +405,26 @@ export default function Tasks() {
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${FOLLOWUP_TYPE_COLORS[followup.type]}`}>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${FOLLOWUP_TYPE_COLORS[followup.type]}`}
+                          >
                             {FOLLOWUP_TYPE_LABELS[followup.type] ?? followup.type}
                           </span>
-                          <span className={`text-xs ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}>
+                          <span
+                            className={`text-xs ${isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"}`}
+                          >
                             <Clock className="inline h-3 w-3 mr-0.5" />
-                            {isOverdue ? "Overdue: " : ""}{format(parseISO(followup.due_date), "MMM d, yyyy")}
+                            {isOverdue ? "Overdue: " : ""}
+                            {format(parseISO(followup.due_date), "MMM d, yyyy")}
                           </span>
                         </div>
-                        {followup.notes && (
-                          <p className="text-xs text-muted-foreground mt-1">{followup.notes}</p>
-                        )}
+                        {followup.notes && <p className="text-xs text-muted-foreground mt-1">{followup.notes}</p>}
                         {followup.email_subject && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); navigate(`/inbox?emailId=${followup.email_id}`); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/inbox?emailId=${followup.email_id}`);
+                            }}
                             className="inline-flex items-center gap-1 text-xs text-primary/80 mt-1 truncate max-w-[250px] hover:text-primary cursor-pointer transition-colors"
                           >
                             <Mail className="h-3 w-3 shrink-0" />
@@ -354,10 +434,23 @@ export default function Tasks() {
                         )}
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingFollowup(followup); setFollowupModalOpen(true); }}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setEditingFollowup(followup);
+                            setFollowupModalOpen(true);
+                          }}
+                        >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteFollowup(followup.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => handleDeleteFollowup(followup.id)}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -372,13 +465,19 @@ export default function Tasks() {
 
       <TaskModal
         open={taskModalOpen}
-        onClose={() => { setTaskModalOpen(false); setEditingTask(null); }}
+        onClose={() => {
+          setTaskModalOpen(false);
+          setEditingTask(null);
+        }}
         onSave={handleSaveTask}
         task={editingTask}
       />
       <FollowupModal
         open={followupModalOpen}
-        onClose={() => { setFollowupModalOpen(false); setEditingFollowup(null); }}
+        onClose={() => {
+          setFollowupModalOpen(false);
+          setEditingFollowup(null);
+        }}
         onSave={handleSaveFollowup}
         followup={editingFollowup}
       />
