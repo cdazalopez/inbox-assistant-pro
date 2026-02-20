@@ -86,7 +86,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
             requires_response: (email as any).requires_response ?? false,
             risk_flags: (email as any).risk_flags ?? [],
             summary: (email as any).summary ?? null,
-          } as EmailAnalysis;
+          } as unknown as EmailAnalysis;
         }
       }
 
