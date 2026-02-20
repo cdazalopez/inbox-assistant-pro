@@ -7,6 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { X, Loader2, Calendar } from "lucide-react";
 
+interface Account {
+  id: string;
+  email: string;
+  provider: string;
+}
+
 interface CreateEventModalProps {
   open: boolean;
   onClose: () => void;
@@ -17,9 +23,12 @@ interface CreateEventModalProps {
     start_time: string;
     end_time: string;
     all_day?: boolean;
+    account_id?: string;
   }) => Promise<void>;
   initialDate?: Date;
   initialHour?: number;
+  accounts?: Account[];
+  defaultAccountId?: string;
 }
 
 export default function CreateEventModal({
@@ -28,6 +37,8 @@ export default function CreateEventModal({
   onSave,
   initialDate,
   initialHour,
+  accounts = [],
+  defaultAccountId,
 }: CreateEventModalProps) {
   const defaultDate = initialDate ?? new Date();
   const defaultHour = initialHour ?? 9;
@@ -42,6 +53,7 @@ export default function CreateEventModal({
   const [startTime, setStartTime] = useState(format(startDefault, "yyyy-MM-dd'T'HH:mm"));
   const [endTime, setEndTime] = useState(format(endDefault, "yyyy-MM-dd'T'HH:mm"));
   const [allDay, setAllDay] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(defaultAccountId);
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
@@ -65,6 +77,7 @@ export default function CreateEventModal({
         start_time: startISO,
         end_time: endISO,
         all_day: allDay,
+        account_id: selectedAccountId,
       });
       // Reset form
       setTitle("");
@@ -120,7 +133,9 @@ export default function CreateEventModal({
 
           <div className="flex items-center gap-3">
             <Switch id="all-day" checked={allDay} onCheckedChange={setAllDay} />
-            <Label htmlFor="all-day" className="cursor-pointer">All day</Label>
+            <Label htmlFor="all-day" className="cursor-pointer">
+              All day
+            </Label>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -154,6 +169,34 @@ export default function CreateEventModal({
               rows={3}
             />
           </div>
+
+          {accounts.length > 1 && (
+            <div>
+              <Label>Add to Calendar</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {accounts.map((acc, idx) => {
+                  const colors = [
+                    "border-blue-500/50 bg-blue-500/10 text-blue-300",
+                    "border-emerald-500/50 bg-emerald-500/10 text-emerald-300",
+                    "border-purple-500/50 bg-purple-500/10 text-purple-300",
+                  ];
+                  const isSelected = selectedAccountId === acc.id;
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => setSelectedAccountId(acc.id)}
+                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${isSelected ? colors[idx % colors.length] : "border-border text-muted-foreground hover:border-primary/30"}`}
+                    >
+                      <div className={`h-2 w-2 rounded-full ${isSelected ? "bg-current" : "bg-muted-foreground/40"}`} />
+                      {acc.email.split("@")[0]}
+                      <span className="opacity-60 capitalize">({acc.provider})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
