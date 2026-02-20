@@ -99,15 +99,8 @@ export default function Inbox() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const {
-    labels,
-    emailLabelsMap,
-    createLabel,
-    updateLabel,
-    deleteLabel,
-    toggleEmailLabel,
-    getLabelsForEmail,
-  } = useLabels();
+  const { labels, emailLabelsMap, createLabel, updateLabel, deleteLabel, toggleEmailLabel, getLabelsForEmail } =
+    useLabels();
   const { templates, trackUsage } = useTemplates();
 
   const inboxStore = useInboxStore();
@@ -159,7 +152,9 @@ export default function Inbox() {
 
   // Task/Followup modal state
   const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [taskInitialData, setTaskInitialData] = useState<{ title?: string; description?: string; priority?: string; email_id?: string } | undefined>();
+  const [taskInitialData, setTaskInitialData] = useState<
+    { title?: string; description?: string; priority?: string; email_id?: string } | undefined
+  >();
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [followupEmailId, setFollowupEmailId] = useState<string | undefined>();
   const [showContactProfile, setShowContactProfile] = useState(false);
@@ -222,12 +217,16 @@ export default function Inbox() {
       try {
         // For special filters, fetch all inbox emails and filter client-side
         const apiFilter = SPECIAL_FILTERS.includes(f) ? "inbox" : f;
-        console.log('Fetching category:', cat);
+        console.log("Fetching category:", cat);
         const data: EmailsResponse = await awsApi.getEmails(
-          user.id, p, limit, apiFilter, s,
+          user.id,
+          p,
+          limit,
+          apiFilter,
+          s,
           undefined,
           selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
-          cat || undefined
+          cat || undefined,
         );
         if (controller.signal.aborted) return;
         if (append) {
@@ -249,7 +248,7 @@ export default function Inbox() {
         }
       }
     },
-    [user?.id, page, filter, search, selectedAccountIds, categoryFilter, toast]
+    [user?.id, page, filter, search, selectedAccountIds, categoryFilter, toast],
   );
 
   const syncAndLoad = useCallback(async () => {
@@ -259,8 +258,8 @@ export default function Inbox() {
       const syncResult = await awsApi.syncEmails(user.id);
       if (accounts.length > 1) {
         const results = syncResult?.results ?? [];
-        const parts = results.map((r: any) => `${r.new_emails ?? 0} from ${r.provider ?? 'account'}`);
-        toast({ title: `Synced ${accounts.length} accounts: ${parts.join(', ')}` });
+        const parts = results.map((r: any) => `${r.new_emails ?? 0} from ${r.provider ?? "account"}`);
+        toast({ title: `Synced ${accounts.length} accounts: ${parts.join(", ")}` });
       } else {
         const newCount = syncResult?.new_emails ?? syncResult?.synced ?? 0;
         toast({ title: `Synced ${newCount} new email${newCount !== 1 ? "s" : ""}` });
@@ -290,10 +289,13 @@ export default function Inbox() {
       syncAndLoad();
       fetchDueSnoozed();
       // Fetch accounts for multi-account filter
-      awsApi.getAccounts(user.id).then((data) => {
-        const accs = data?.accounts ?? data;
-        if (Array.isArray(accs)) setAccounts(accs);
-      }).catch(() => {});
+      awsApi
+        .getAccounts(user.id)
+        .then((data) => {
+          const accs = data?.accounts ?? data;
+          if (Array.isArray(accs)) setAccounts(accs);
+        })
+        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -337,7 +339,7 @@ export default function Inbox() {
         const data = await awsApi.getEmails(user.id, 1, 200, "inbox");
         const found = (data.emails ?? []).find((e: Email) => e.id === initialEmailId);
         if (found) {
-          setEmails((prev) => prev.some((e) => e.id === found.id) ? prev : [found, ...prev]);
+          setEmails((prev) => (prev.some((e) => e.id === found.id) ? prev : [found, ...prev]));
           handleSelectEmail(found);
           return;
         }
@@ -381,11 +383,8 @@ export default function Inbox() {
     e.stopPropagation();
     try {
       await awsApi.updateEmail(email.id, email.is_starred ? "unstar" : "star");
-      setEmails((prev) =>
-        prev.map((em) => (em.id === email.id ? { ...em, is_starred: !em.is_starred } : em))
-      );
-      if (selectedEmail?.id === email.id)
-        setSelectedEmail((prev) => prev && { ...prev, is_starred: !prev.is_starred });
+      setEmails((prev) => prev.map((em) => (em.id === email.id ? { ...em, is_starred: !em.is_starred } : em)));
+      if (selectedEmail?.id === email.id) setSelectedEmail((prev) => prev && { ...prev, is_starred: !prev.is_starred });
     } catch {
       toast({ title: "Action failed", variant: "destructive" });
     }
@@ -405,11 +404,8 @@ export default function Inbox() {
   const handleMarkUnread = async (email: Email) => {
     try {
       await awsApi.updateEmail(email.id, "mark_unread");
-      setEmails((prev) =>
-        prev.map((em) => (em.id === email.id ? { ...em, is_read: false } : em))
-      );
-      if (selectedEmail?.id === email.id)
-        setSelectedEmail((prev) => prev && { ...prev, is_read: false });
+      setEmails((prev) => prev.map((em) => (em.id === email.id ? { ...em, is_read: false } : em)));
+      if (selectedEmail?.id === email.id) setSelectedEmail((prev) => prev && { ...prev, is_read: false });
     } catch {
       toast({ title: "Action failed", variant: "destructive" });
     }
@@ -425,27 +421,29 @@ export default function Inbox() {
 
     if (!email.is_read) {
       awsApi.updateEmail(email.id, "mark_read").catch(() => {});
-      setEmails((prev) =>
-        prev.map((em) => (em.id === email.id ? { ...em, is_read: true } : em))
-      );
+      setEmails((prev) => prev.map((em) => (em.id === email.id ? { ...em, is_read: true } : em)));
       // Fire-and-forget: auto-complete related tasks via orchestrator
       if (user?.id) {
-        fetch('https://vr21smw04e.execute-api.us-east-2.amazonaws.com/briefing-orchestrator', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        fetch("https://vr21smw04e.execute-api.us-east-2.amazonaws.com/briefing-orchestrator", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: 'complete_task_by_email',
+            action: "complete_task_by_email",
             user_id: user.id,
             email_id: email.id,
           }),
-        }).catch((e) => console.log('Task auto-complete failed silently:', e));
+        }).catch((e) => console.log("Task auto-complete failed silently:", e));
       }
     }
 
     // Fetch body and analysis in parallel
-    const bodyPromise = awsApi.getEmail(email.id).then((data) => {
-      setEmailBody(data.body ?? data.html_body ?? null);
-    }).catch(() => setEmailBody(null)).finally(() => setLoadingBody(false));
+    const bodyPromise = awsApi
+      .getEmail(email.id)
+      .then((data) => {
+        setEmailBody(data.body ?? data.html_body ?? null);
+      })
+      .catch(() => setEmailBody(null))
+      .finally(() => setLoadingBody(false));
 
     const analysisPromise = getOrAnalyze(email.id, {
       id: email.id,
@@ -454,13 +452,16 @@ export default function Inbox() {
       subject: email.subject,
       snippet: email.snippet,
       user_id: user?.id ?? "",
-    }).then((result) => {
-      setCurrentAnalysis(result);
-      // Update the analyses map so the list badge shows immediately
-      setAnalysesMap((prev) => ({ ...prev, [email.id]: result }));
-    }).catch((err) => {
-      setAnalysisError(err?.message ?? "Analysis failed");
-    }).finally(() => setAnalysisLoading(false));
+    })
+      .then((result) => {
+        setCurrentAnalysis(result);
+        // Update the analyses map so the list badge shows immediately
+        setAnalysesMap((prev) => ({ ...prev, [email.id]: result }));
+      })
+      .catch((err) => {
+        setAnalysisError(err?.message ?? "Analysis failed");
+      })
+      .finally(() => setAnalysisLoading(false));
 
     await Promise.all([bodyPromise, analysisPromise]);
 
@@ -509,8 +510,8 @@ export default function Inbox() {
             subject: email.subject,
             snippet: email.snippet,
             user_id: user.id,
-          })
-        )
+          }),
+        ),
       );
       // Update map with successful results
       const newEntries: Record<string, EmailAnalysis> = {};
@@ -527,10 +528,7 @@ export default function Inbox() {
     toast({ title: `Analyzed ${unanalyzed.length} email${unanalyzed.length !== 1 ? "s" : ""}` });
   }, [user?.id, emails, analysesMap, batchAnalyzing, toast]);
 
-  const unreadEmailIds = useMemo(
-    () => new Set(emails.filter((e) => !e.is_read).map((e) => e.id)),
-    [emails]
-  );
+  const unreadEmailIds = useMemo(() => new Set(emails.filter((e) => !e.is_read).map((e) => e.id)), [emails]);
 
   // Thread counts for badges
   const threadCounts = useMemo(() => {
@@ -554,48 +552,54 @@ export default function Inbox() {
     return generateSuggestions({ emails, analysesMap, unreadIds: unreadEmailIds });
   }, [emails, analysesMap, unreadEmailIds]);
 
-  const handleSuggestionAction = useCallback((s: SmartSuggestion) => {
-    if (s.type === "bulk_archive" && s.action === "archive") {
-      // Archive all emails in the suggestion
-      Promise.all(s.emailIds.map((id) => awsApi.updateEmail(id, "archive")))
-        .then(() => {
-          setEmails((prev) => prev.filter((e) => !s.emailIds.includes(e.id)));
-          toast({ title: `Archived ${s.emailIds.length} emails` });
-        })
-        .catch(() => toast({ title: "Archive failed", variant: "destructive" }));
-    } else if (s.type === "reply_urgent" || s.type === "review_risk" || s.type === "follow_up") {
-      // Select the first email from the suggestion
-      const target = emails.find((e) => s.emailIds.includes(e.id));
-      if (target) handleSelectEmail(target);
-    } else if (s.type === "group_sender") {
-      // Filter by sender
-      const target = emails.find((e) => s.emailIds.includes(e.id));
-      if (target) {
-        setSearchInput(target.from_address);
-        setSearch(target.from_address);
-        setPage(1);
+  const handleSuggestionAction = useCallback(
+    (s: SmartSuggestion) => {
+      if (s.type === "bulk_archive" && s.action === "archive") {
+        // Archive all emails in the suggestion
+        Promise.all(s.emailIds.map((id) => awsApi.updateEmail(id, "archive")))
+          .then(() => {
+            setEmails((prev) => prev.filter((e) => !s.emailIds.includes(e.id)));
+            toast({ title: `Archived ${s.emailIds.length} emails` });
+          })
+          .catch(() => toast({ title: "Archive failed", variant: "destructive" }));
+      } else if (s.type === "reply_urgent" || s.type === "review_risk" || s.type === "follow_up") {
+        // Select the first email from the suggestion
+        const target = emails.find((e) => s.emailIds.includes(e.id));
+        if (target) handleSelectEmail(target);
+      } else if (s.type === "group_sender") {
+        // Filter by sender
+        const target = emails.find((e) => s.emailIds.includes(e.id));
+        if (target) {
+          setSearchInput(target.from_address);
+          setSearch(target.from_address);
+          setPage(1);
+        }
       }
-    }
-  }, [emails, toast]);
+    },
+    [emails, toast],
+  );
 
   // Snooze handler
-  const handleSnoozeEmail = useCallback(async (email: Email, wakeAt: string, reason: string, contextNote?: string) => {
-    if (!user?.id) return;
-    try {
-      await awsApi.snoozeEmail({
-        user_id: user.id,
-        email_id: email.id,
-        wake_at: wakeAt,
-        reason,
-        context_note: contextNote,
-      });
-      setEmails((prev) => prev.filter((e) => e.id !== email.id));
-      if (selectedEmail?.id === email.id) setSelectedEmail(null);
-      toast({ title: `⏰ Snoozed until ${format(new Date(wakeAt), "MMM d, h:mm a")}` });
-    } catch {
-      toast({ title: "Failed to snooze", variant: "destructive" });
-    }
-  }, [user?.id, selectedEmail, toast]);
+  const handleSnoozeEmail = useCallback(
+    async (email: Email, wakeAt: string, reason: string, contextNote?: string) => {
+      if (!user?.id) return;
+      try {
+        await awsApi.snoozeEmail({
+          user_id: user.id,
+          email_id: email.id,
+          wake_at: wakeAt,
+          reason,
+          context_note: contextNote,
+        });
+        setEmails((prev) => prev.filter((e) => e.id !== email.id));
+        if (selectedEmail?.id === email.id) setSelectedEmail(null);
+        toast({ title: `⏰ Snoozed until ${format(new Date(wakeAt), "MMM d, h:mm a")}` });
+      } catch {
+        toast({ title: "Failed to snooze", variant: "destructive" });
+      }
+    },
+    [user?.id, selectedEmail, toast],
+  );
 
   // Fetch AI context suggestion when selecting an email
   const fetchAiSnoozeContext = useCallback(async (email: Email) => {
@@ -644,10 +648,7 @@ export default function Inbox() {
       />
 
       {/* Smart Suggestions Bar */}
-      <InboxSuggestionBar
-        suggestions={inboxSuggestions}
-        onAction={handleSuggestionAction}
-      />
+      <InboxSuggestionBar suggestions={inboxSuggestions} onAction={handleSuggestionAction} />
 
       {/* Header */}
       <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -658,7 +659,14 @@ export default function Inbox() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => { setComposeReplyTo(null); setComposeInitialCc(""); setComposeOpen(true); }}>
+          <Button
+            size="sm"
+            onClick={() => {
+              setComposeReplyTo(null);
+              setComposeInitialCc("");
+              setComposeOpen(true);
+            }}
+          >
             <PenSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Compose</span>
           </Button>
@@ -676,7 +684,9 @@ export default function Inbox() {
             {batchAnalyzing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="hidden sm:inline">{batchProgress.done}/{batchProgress.total}</span>
+                <span className="hidden sm:inline">
+                  {batchProgress.done}/{batchProgress.total}
+                </span>
               </>
             ) : (
               <>
@@ -700,7 +710,13 @@ export default function Inbox() {
 
       {/* Filters */}
       <div className="border-b border-border px-4 py-2">
-        <Tabs value={filter} onValueChange={(v) => { setFilter(v); setPage(1); }}>
+        <Tabs
+          value={filter}
+          onValueChange={(v) => {
+            setFilter(v);
+            setPage(1);
+          }}
+        >
           <TabsList>
             <TabsTrigger value="inbox">All</TabsTrigger>
             <TabsTrigger value="unread">Unread</TabsTrigger>
@@ -714,7 +730,10 @@ export default function Inbox() {
       {/* Account Filter Bar */}
       <AccountFilterBar
         selectedAccountIds={selectedAccountIds}
-        onSelectionChange={(ids) => { setSelectedAccountIds(ids); setPage(1); }}
+        onSelectionChange={(ids) => {
+          setSelectedAccountIds(ids);
+          setPage(1);
+        }}
         accounts={accounts}
       />
 
@@ -770,9 +789,7 @@ export default function Inbox() {
                 const analysis = analysesMap[email.id];
                 const urgencyLevel = analysis ? getUrgencyLevel(analysis.urgency) : null;
                 const urgencyDotClass = urgencyLevel ? URGENCY_DOT_COLORS[urgencyLevel] : null;
-                const catClass = analysis
-                  ? CATEGORY_COLORS[analysis.category] ?? CATEGORY_COLORS.general
-                  : null;
+                const catClass = analysis ? (CATEGORY_COLORS[analysis.category] ?? CATEGORY_COLORS.general) : null;
 
                 return (
                   <button
@@ -785,9 +802,7 @@ export default function Inbox() {
                   >
                     {/* Urgency dot */}
                     <div className="flex w-2.5 shrink-0 items-center justify-center">
-                      {urgencyDotClass && (
-                        <div className={`h-2 w-2 rounded-full ${urgencyDotClass}`} />
-                      )}
+                      {urgencyDotClass && <div className={`h-2 w-2 rounded-full ${urgencyDotClass}`} />}
                     </div>
                     <Checkbox onClick={(e) => e.stopPropagation()} className="shrink-0" />
                     <button onClick={(e) => handleStar(e, email)} className="shrink-0">
@@ -802,10 +817,7 @@ export default function Inbox() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         {accounts.length > 1 && (
-                          <AccountIndicator
-                            provider={email.account_provider}
-                            email={email.account_email}
-                          />
+                          <AccountIndicator provider={email.account_provider} email={email.account_email} />
                         )}
                         <span
                           className={`truncate text-sm ${
@@ -814,9 +826,7 @@ export default function Inbox() {
                         >
                           {email.from_name || email.from_address}
                         </span>
-                        {email.has_attachments && (
-                          <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        )}
+                        {email.has_attachments && <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />}
                       </div>
                       <div className="flex items-center gap-1.5">
                         {isMeetingEmail(email.subject, analysis?.category) && (
@@ -845,7 +855,9 @@ export default function Inbox() {
                           </Badge>
                         )}
                         {catClass && (
-                          <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${catClass}`}>
+                          <span
+                            className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${catClass}`}
+                          >
                             {analysis!.category}
                           </span>
                         )}
@@ -908,33 +920,12 @@ export default function Inbox() {
               <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedEmail(null)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => {
-                setComposeForwardFrom(null);
-                setComposeInitialCc("");
-                setComposeReplyTo({
-                  id: selectedEmail.id,
-                  nylas_id: selectedEmail.nylas_id,
-                  from_name: selectedEmail.from_name,
-                  from_address: selectedEmail.from_address,
-                  subject: selectedEmail.subject,
-                  snippet: selectedEmail.snippet,
-                  body: emailBody ?? undefined,
-                  received_at: selectedEmail.received_at,
-                  account_email: selectedEmail.account_email,
-                });
-                setComposeOpen(true);
-              }}>
-                <Reply className="h-4 w-4" />
-                Reply
-              </Button>
-              {(selectedEmail.to_addresses?.length > 1 || selectedEmail.to_addresses?.some(r => r.email !== selectedEmail.from_address)) && (
-                <Button variant="outline" size="sm" onClick={() => {
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
                   setComposeForwardFrom(null);
-                  const userEmail = selectedEmail.account_email || user?.email || "";
-                  const ccRecipients = (selectedEmail.to_addresses ?? [])
-                    .filter(r => r.email !== selectedEmail.from_address && r.email !== userEmail)
-                    .map(r => r.email);
-                  setComposeInitialCc(ccRecipients.join(", "));
+                  setComposeInitialCc("");
                   setComposeReplyTo({
                     id: selectedEmail.id,
                     nylas_id: selectedEmail.nylas_id,
@@ -947,48 +938,90 @@ export default function Inbox() {
                     account_email: selectedEmail.account_email,
                   });
                   setComposeOpen(true);
-                }}>
+                }}
+              >
+                <Reply className="h-4 w-4" />
+                Reply
+              </Button>
+              {(selectedEmail.to_addresses?.length > 1 ||
+                selectedEmail.to_addresses?.some((r) => r.email !== selectedEmail.from_address)) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setComposeForwardFrom(null);
+                    const userEmail = selectedEmail.account_email || user?.email || "";
+                    const ccRecipients = (selectedEmail.to_addresses ?? [])
+                      .filter((r) => r.email !== selectedEmail.from_address && r.email !== userEmail)
+                      .map((r) => r.email);
+                    setComposeInitialCc(ccRecipients.join(", "));
+                    setComposeReplyTo({
+                      id: selectedEmail.id,
+                      nylas_id: selectedEmail.nylas_id,
+                      from_name: selectedEmail.from_name,
+                      from_address: selectedEmail.from_address,
+                      subject: selectedEmail.subject,
+                      snippet: selectedEmail.snippet,
+                      body: emailBody ?? undefined,
+                      received_at: selectedEmail.received_at,
+                      account_email: selectedEmail.account_email,
+                    });
+                    setComposeOpen(true);
+                  }}
+                >
                   <ReplyAll className="h-4 w-4" />
                   Reply All
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => {
-                setComposeReplyTo(null);
-                setComposeInitialCc("");
-                setComposeForwardFrom({
-                  from_name: selectedEmail.from_name,
-                  from_address: selectedEmail.from_address,
-                  to_addresses: selectedEmail.to_addresses,
-                  subject: selectedEmail.subject,
-                  body: emailBody ?? undefined,
-                  snippet: selectedEmail.snippet,
-                  received_at: selectedEmail.received_at,
-                  has_attachments: selectedEmail.has_attachments,
-                });
-                setComposeOpen(true);
-              }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setComposeReplyTo(null);
+                  setComposeInitialCc("");
+                  setComposeForwardFrom({
+                    from_name: selectedEmail.from_name,
+                    from_address: selectedEmail.from_address,
+                    to_addresses: selectedEmail.to_addresses,
+                    subject: selectedEmail.subject,
+                    body: emailBody ?? undefined,
+                    snippet: selectedEmail.snippet,
+                    received_at: selectedEmail.received_at,
+                    has_attachments: selectedEmail.has_attachments,
+                  });
+                  setComposeOpen(true);
+                }}
+              >
                 <Forward className="h-4 w-4" />
                 Forward
               </Button>
               <div className="flex-1" />
-              <Button variant="outline" size="sm" onClick={() => {
-                const analysis = analysesMap[selectedEmail.id];
-                const urgencyToPriority = (u: number) => u >= 4 ? "high" : u >= 3 ? "medium" : "low";
-                setTaskInitialData({
-                  title: selectedEmail.subject || "Follow up",
-                  description: analysis?.summary ?? selectedEmail.snippet,
-                  priority: analysis ? urgencyToPriority(analysis.urgency) : "medium",
-                  email_id: selectedEmail.id,
-                });
-                setTaskModalOpen(true);
-              }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const analysis = analysesMap[selectedEmail.id];
+                  const urgencyToPriority = (u: number) => (u >= 4 ? "high" : u >= 3 ? "medium" : "low");
+                  setTaskInitialData({
+                    title: selectedEmail.subject || "Follow up",
+                    description: analysis?.summary ?? selectedEmail.snippet,
+                    priority: analysis ? urgencyToPriority(analysis.urgency) : "medium",
+                    email_id: selectedEmail.id,
+                  });
+                  setTaskModalOpen(true);
+                }}
+              >
                 <ListTodo className="h-4 w-4" />
                 <span className="hidden sm:inline">Create Task</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => {
-                setFollowupEmailId(selectedEmail.id);
-                setFollowupModalOpen(true);
-              }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFollowupEmailId(selectedEmail.id);
+                  setFollowupModalOpen(true);
+                }}
+              >
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Follow-up</span>
               </Button>
@@ -1003,7 +1036,9 @@ export default function Inbox() {
                 loadingAiSuggestion={loadingAiSnooze}
               />
               <Button variant="ghost" size="icon" onClick={(e) => handleStar(e, selectedEmail)}>
-                <Star className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                <Star
+                  className={`h-4 w-4 ${selectedEmail.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                />
               </Button>
               <Button variant="ghost" size="icon" onClick={() => handleArchive(selectedEmail)}>
                 <Archive className="h-4 w-4 text-muted-foreground" />
@@ -1022,9 +1057,7 @@ export default function Inbox() {
               </Button>
             </div>
             <div className="p-6 space-y-4">
-              <h2 className="text-xl font-semibold text-foreground">
-                {selectedEmail.subject || "(No subject)"}
-              </h2>
+              <h2 className="text-xl font-semibold text-foreground">{selectedEmail.subject || "(No subject)"}</h2>
               {/* Labels on detail view */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {getLabelsForEmail(selectedEmail.id).map((lbl) => (
@@ -1060,10 +1093,15 @@ export default function Inbox() {
                     >
                       {selectedEmail.from_name || selectedEmail.from_address}
                     </button>
-                    {currentAnalysis?.sentiment && (() => {
-                      const { emoji, color } = getSentimentEmoji(currentAnalysis.sentiment);
-                      return <span className={`${color} text-sm`} title={`Tone: ${currentAnalysis.sentiment}`}>{emoji}</span>;
-                    })()}
+                    {currentAnalysis?.sentiment &&
+                      (() => {
+                        const { emoji, color } = getSentimentEmoji(currentAnalysis.sentiment);
+                        return (
+                          <span className={`${color} text-sm`} title={`Tone: ${currentAnalysis.sentiment}`}>
+                            {emoji}
+                          </span>
+                        );
+                      })()}
                   </div>
                   <p className="text-xs text-muted-foreground">{selectedEmail.from_address}</p>
                 </div>
@@ -1078,11 +1116,6 @@ export default function Inbox() {
                   email={selectedEmail.from_address}
                   name={selectedEmail.from_name}
                   onClose={() => setShowContactProfile(false)}
-                  onNavigateToEmail={(emailId) => {
-                    const target = emails.find((e) => e.id === emailId);
-                    if (target) handleSelectEmail(target);
-                    setShowContactProfile(false);
-                  }}
                 />
               )}
 
@@ -1132,29 +1165,16 @@ export default function Inbox() {
               )}
 
               {/* Thread Summary */}
-              <ThreadSummaryPanel
-                selectedEmail={selectedEmail}
-                allEmails={emails}
-              />
+              <ThreadSummaryPanel selectedEmail={selectedEmail} allEmails={emails} />
 
               {/* Sentiment Trend */}
-              <SentimentTrendPanel
-                selectedEmail={selectedEmail}
-                allEmails={emails}
-                analysesMap={analysesMap}
-              />
+              <SentimentTrendPanel selectedEmail={selectedEmail} allEmails={emails} analysesMap={analysesMap} />
 
               {/* AI Insights */}
-              <AIInsightsCard
-                analysis={currentAnalysis}
-                loading={analysisLoading}
-                error={analysisError}
-              />
+              <AIInsightsCard analysis={currentAnalysis} loading={analysisLoading} error={analysisError} />
 
               {/* Calendar Context - show for meeting-related emails */}
-              {isMeetingEmail(selectedEmail.subject, currentAnalysis?.category) && (
-                <CalendarContext />
-              )}
+              {isMeetingEmail(selectedEmail.subject, currentAnalysis?.category) && <CalendarContext />}
             </div>
           </div>
         ) : (
@@ -1166,7 +1186,13 @@ export default function Inbox() {
 
       <ComposeModal
         open={composeOpen}
-        onClose={() => { setComposeOpen(false); setComposeReplyTo(null); setComposeForwardFrom(null); setComposeInitialBody(undefined); setComposeEmailCategory(undefined); }}
+        onClose={() => {
+          setComposeOpen(false);
+          setComposeReplyTo(null);
+          setComposeForwardFrom(null);
+          setComposeInitialBody(undefined);
+          setComposeEmailCategory(undefined);
+        }}
         replyTo={composeReplyTo ?? undefined}
         forwardFrom={composeForwardFrom ?? undefined}
         initialCc={composeInitialCc}
@@ -1177,7 +1203,10 @@ export default function Inbox() {
 
       <TaskModal
         open={taskModalOpen}
-        onClose={() => { setTaskModalOpen(false); setTaskInitialData(undefined); }}
+        onClose={() => {
+          setTaskModalOpen(false);
+          setTaskInitialData(undefined);
+        }}
         onSave={async (data) => {
           if (!user?.id) return;
           await awsApi.createTask({ user_id: user.id, ...data });
@@ -1188,7 +1217,10 @@ export default function Inbox() {
 
       <FollowupModal
         open={followupModalOpen}
-        onClose={() => { setFollowupModalOpen(false); setFollowupEmailId(undefined); }}
+        onClose={() => {
+          setFollowupModalOpen(false);
+          setFollowupEmailId(undefined);
+        }}
         onSave={async (data) => {
           if (!user?.id) return;
           await awsApi.createFollowup({ user_id: user.id, ...data });
