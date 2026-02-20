@@ -264,11 +264,17 @@ export default function Tasks() {
                   <div
                     key={task.id}
                     ref={initialTaskId === task.id ? highlightRef : undefined}
-                    className={`rounded-lg border bg-card p-4 transition-colors ${task.status === "done" ? "opacity-60" : ""} ${isOverdueStatus ? "border-destructive/50 bg-destructive/5" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}
+                    onClick={() => {
+                      if (task.email_id) navigate(`/inbox?emailId=${task.email_id}`);
+                    }}
+                    className={`rounded-lg border bg-card p-4 transition-colors ${task.email_id ? "cursor-pointer hover:border-primary/50 hover:bg-muted/30" : ""} ${task.status === "done" ? "opacity-60" : ""} ${isOverdueStatus ? "border-destructive/50 bg-destructive/5" : ""} ${initialTaskId === task.id ? "border-primary ring-1 ring-primary/30" : "border-border"}`}
                   >
                     <div className="flex items-start gap-3">
                       <button
-                        onClick={() => handleCycleStatus(task)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCycleStatus(task);
+                        }}
                         className="mt-0.5 shrink-0"
                         title={`Status: ${task.status}. Click to cycle.`}
                       >
@@ -283,6 +289,12 @@ export default function Tasks() {
                           >
                             {task.title}
                           </span>
+                          {task.email_id && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0 text-[10px] font-medium leading-4">
+                              <Mail className="h-2.5 w-2.5" />
+                              Open Email →
+                            </span>
+                          )}
                           <span
                             className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium leading-4 ${PRIORITY_COLORS[task.priority]}`}
                           >
@@ -333,7 +345,8 @@ export default function Tasks() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingTask(task);
                             setTaskModalOpen(true);
                           }}
@@ -344,7 +357,10 @@ export default function Tasks() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive"
-                          onClick={() => handleDeleteTask(task.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task.id);
+                          }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
