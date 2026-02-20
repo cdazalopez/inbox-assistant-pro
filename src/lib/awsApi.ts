@@ -1,4 +1,4 @@
-const API_BASE = 'https://vr21smw04e.execute-api.us-east-2.amazonaws.com';
+const API_BASE = "https://vr21smw04e.execute-api.us-east-2.amazonaws.com";
 
 export const awsApi = {
   getUser: async (email: string) => {
@@ -8,14 +8,14 @@ export const awsApi = {
 
   createUser: async (user: { id: string; email: string; name: string }) => {
     const res = await fetch(`${API_BASE}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
     });
     return res.json();
   },
 
-  connectEmail: async (userId: string, provider: 'google' | 'microsoft') => {
+  connectEmail: async (userId: string, provider: "google" | "microsoft") => {
     const res = await fetch(`${API_BASE}/connect-email?user_id=${userId}&provider=${provider}`);
     const data = await res.json();
     return data;
@@ -26,27 +26,36 @@ export const awsApi = {
     return res.json();
   },
 
-  getEmails: async (userId: string, page = 1, limit = 200, filter = 'inbox', search = '', accountId?: string, accountIds?: string[], category?: string) => {
+  getEmails: async (
+    userId: string,
+    page = 1,
+    limit = 200,
+    filter = "inbox",
+    search = "",
+    accountId?: string,
+    accountIds?: string[],
+    category?: string,
+  ) => {
     const params = new URLSearchParams({ user_id: userId, page: String(page), limit: String(limit), filter, search });
-    if (accountId) params.append('account_id', accountId);
-    if (accountIds && accountIds.length > 0) params.append('account_ids', accountIds.join(','));
-    if (category) params.append('category', category);
+    if (accountId) params.append("account_id", accountId);
+    if (accountIds && accountIds.length > 0) params.append("account_ids", accountIds.join(","));
+    if (category) params.append("category", category);
     const res = await fetch(`${API_BASE}/emails?${params}`);
     return res.json();
   },
 
   syncEmails: async (userId: string, accountId?: string, range?: string) => {
     const params = new URLSearchParams({ user_id: userId });
-    if (accountId) params.append('account_id', accountId);
-    if (range) params.append('range', range);
+    if (accountId) params.append("account_id", accountId);
+    if (range) params.append("range", range);
     const res = await fetch(`${API_BASE}/sync-emails?${params}`);
     return res.json();
   },
 
   updateEmail: async (emailId: string, action: string) => {
     const res = await fetch(`${API_BASE}/emails`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email_id: emailId, action }),
     });
     return res.json();
@@ -59,8 +68,8 @@ export const awsApi = {
 
   storeAnalysis: async (analysis: any) => {
     const res = await fetch(`${API_BASE}/analysis`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(analysis),
     });
     return res.json();
@@ -88,19 +97,19 @@ export const awsApi = {
     reply_to_message_id?: string;
   }) => {
     const res = await fetch(`${API_BASE}/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to send email');
+    if (!res.ok) throw new Error("Failed to send email");
     return res.json();
   },
 
   getBriefings: async (userId: string, date?: string) => {
     const params = new URLSearchParams({ user_id: userId });
-    if (date) params.append('date', date);
+    if (date) params.append("date", date);
     const res = await fetch(`${API_BASE}/briefings?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch briefings');
+    if (!res.ok) throw new Error("Failed to fetch briefings");
     const data = await res.json();
     return data.briefings;
   },
@@ -114,18 +123,18 @@ export const awsApi = {
     pending_count: number;
   }) => {
     const res = await fetch(`${API_BASE}/briefings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to store briefing');
+    if (!res.ok) throw new Error("Failed to store briefing");
     return res.json();
   },
 
   // Tasks
   getTasks: async (userId: string, status?: string) => {
     const params = new URLSearchParams({ user_id: userId });
-    if (status) params.append('status', status);
+    if (status) params.append("status", status);
     const res = await fetch(`${API_BASE}/tasks?${params}`);
     return res.json();
   },
@@ -139,11 +148,11 @@ export const awsApi = {
     priority?: string;
   }) => {
     const res = await fetch(`${API_BASE}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to create task');
+    if (!res.ok) throw new Error("Failed to create task");
     return res.json();
   },
 
@@ -157,26 +166,26 @@ export const awsApi = {
     status?: string;
   }) => {
     const res = await fetch(`${API_BASE}/tasks`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to update task');
+    if (!res.ok) throw new Error("Failed to update task");
     return res.json();
   },
 
   deleteTask: async (taskId: string, userId: string) => {
     const res = await fetch(`${API_BASE}/tasks?task_id=${taskId}&user_id=${userId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
-    if (!res.ok) throw new Error('Failed to delete task');
+    if (!res.ok) throw new Error("Failed to delete task");
     return res.json();
   },
 
   // Follow-ups
   getFollowups: async (userId: string, status?: string) => {
     const params = new URLSearchParams({ user_id: userId });
-    if (status) params.append('status', status);
+    if (status) params.append("status", status);
     const res = await fetch(`${API_BASE}/followups?${params}`);
     return res.json();
   },
@@ -189,11 +198,11 @@ export const awsApi = {
     notes?: string;
   }) => {
     const res = await fetch(`${API_BASE}/followups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to create follow-up');
+    if (!res.ok) throw new Error("Failed to create follow-up");
     return res.json();
   },
 
@@ -206,31 +215,32 @@ export const awsApi = {
     notes?: string;
   }) => {
     const res = await fetch(`${API_BASE}/followups`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to update follow-up');
+    if (!res.ok) throw new Error("Failed to update follow-up");
     return res.json();
   },
 
   deleteFollowup: async (followupId: string, userId: string) => {
     const res = await fetch(`${API_BASE}/followups?followup_id=${followupId}&user_id=${userId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
-    if (!res.ok) throw new Error('Failed to delete follow-up');
+    if (!res.ok) throw new Error("Failed to delete follow-up");
     return res.json();
   },
 
   // Calendar
-  getCalendarEvents: async (userId: string, daysAhead = 7, daysBehind = 1) => {
+  getCalendarEvents: async (userId: string, daysAhead = 7, daysBehind = 7, accountId?: string) => {
     const params = new URLSearchParams({
       user_id: userId,
       days_ahead: String(daysAhead),
       days_behind: String(daysBehind),
     });
+    if (accountId) params.append("account_id", accountId);
     const res = await fetch(`${API_BASE}/calendar?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch calendar events');
+    if (!res.ok) throw new Error("Failed to fetch calendar events");
     return res.json();
   },
 
@@ -242,23 +252,24 @@ export const awsApi = {
     start_time: string;
     end_time: string;
     all_day?: boolean;
+    account_id?: string;
     participants?: { email: string }[];
   }) => {
     const res = await fetch(`${API_BASE}/calendar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to create event');
+    if (!res.ok) throw new Error("Failed to create event");
     return res.json();
   },
 
   // Templates
   getTemplates: async (userId: string, category?: string) => {
     const params = new URLSearchParams({ user_id: userId });
-    if (category) params.append('category', category);
+    if (category) params.append("category", category);
     const res = await fetch(`${API_BASE}/templates?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch templates');
+    if (!res.ok) throw new Error("Failed to fetch templates");
     const data = await res.json();
     return data.templates ?? data;
   },
@@ -272,11 +283,11 @@ export const awsApi = {
     tone: string;
   }) => {
     const res = await fetch(`${API_BASE}/templates`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to create template');
+    if (!res.ok) throw new Error("Failed to create template");
     return res.json();
   },
 
@@ -291,43 +302,43 @@ export const awsApi = {
     increment_use?: boolean;
   }) => {
     const res = await fetch(`${API_BASE}/templates`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to update template');
+    if (!res.ok) throw new Error("Failed to update template");
     return res.json();
   },
 
   deleteTemplate: async (templateId: string, userId: string) => {
     const res = await fetch(`${API_BASE}/templates?template_id=${templateId}&user_id=${userId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
-    if (!res.ok) throw new Error('Failed to delete template');
+    if (!res.ok) throw new Error("Failed to delete template");
     return res.json();
   },
 
   // Contacts
   getContactsList: async (userId: string, limit = 20) => {
-    const params = new URLSearchParams({ user_id: userId, action: 'list', limit: String(limit) });
+    const params = new URLSearchParams({ user_id: userId, action: "list", limit: String(limit) });
     const res = await fetch(`${API_BASE}/contacts?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch contacts');
+    if (!res.ok) throw new Error("Failed to fetch contacts");
     const data = await res.json();
     return data.contacts;
   },
 
   getContactProfile: async (userId: string, email: string) => {
-    const params = new URLSearchParams({ user_id: userId, action: 'profile', email });
+    const params = new URLSearchParams({ user_id: userId, action: "profile", email });
     const res = await fetch(`${API_BASE}/contacts?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch contact profile');
+    if (!res.ok) throw new Error("Failed to fetch contact profile");
     const data = await res.json();
     return data.profile;
   },
 
   getContactHistory: async (userId: string, email: string, limit = 20) => {
-    const params = new URLSearchParams({ user_id: userId, action: 'history', email, limit: String(limit) });
+    const params = new URLSearchParams({ user_id: userId, action: "history", email, limit: String(limit) });
     const res = await fetch(`${API_BASE}/contacts?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch contact history');
+    if (!res.ok) throw new Error("Failed to fetch contact history");
     const data = await res.json();
     return data.emails;
   },
@@ -336,21 +347,21 @@ export const awsApi = {
   getAnalytics: async (userId: string, period = 30) => {
     const params = new URLSearchParams({ user_id: userId, period: String(period) });
     const res = await fetch(`${API_BASE}/analytics?${params}`);
-    if (!res.ok) throw new Error('Failed to fetch analytics');
+    if (!res.ok) throw new Error("Failed to fetch analytics");
     return res.json();
   },
 
   // Snooze
   getSnoozedEmails: async (userId: string) => {
     const res = await fetch(`${API_BASE}/snooze?user_id=${userId}`);
-    if (!res.ok) throw new Error('Failed to fetch snoozed emails');
+    if (!res.ok) throw new Error("Failed to fetch snoozed emails");
     const data = await res.json();
     return data.snoozed ?? data;
   },
 
   getDueSnoozed: async (userId: string) => {
     const res = await fetch(`${API_BASE}/snooze?user_id=${userId}&include_due=true`);
-    if (!res.ok) throw new Error('Failed to fetch due snoozed');
+    if (!res.ok) throw new Error("Failed to fetch due snoozed");
     const data = await res.json();
     return data.snoozed ?? data;
   },
@@ -363,11 +374,11 @@ export const awsApi = {
     context_note?: string;
   }) => {
     const res = await fetch(`${API_BASE}/snooze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to snooze email');
+    if (!res.ok) throw new Error("Failed to snooze email");
     return res.json();
   },
 
@@ -380,33 +391,29 @@ export const awsApi = {
     status?: string;
   }) => {
     const res = await fetch(`${API_BASE}/snooze`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to update snooze');
+    if (!res.ok) throw new Error("Failed to update snooze");
     return res.json();
   },
 
   deleteSnooze: async (snoozeId: string, userId: string) => {
     const res = await fetch(`${API_BASE}/snooze?snooze_id=${snoozeId}&user_id=${userId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
-    if (!res.ok) throw new Error('Failed to delete snooze');
+    if (!res.ok) throw new Error("Failed to delete snooze");
     return res.json();
   },
 
-  bulkDelete: async (params: {
-    user_id: string;
-    categories: string[];
-    delete_from_provider?: boolean;
-  }) => {
+  bulkDelete: async (params: { user_id: string; categories: string[]; delete_from_provider?: boolean }) => {
     const res = await fetch(`${API_BASE}/bulk-delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     });
-    if (!res.ok) throw new Error('Failed to bulk delete');
+    if (!res.ok) throw new Error("Failed to bulk delete");
     return res.json();
   },
 };
