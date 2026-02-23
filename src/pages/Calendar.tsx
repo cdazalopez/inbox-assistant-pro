@@ -23,6 +23,7 @@ import {
   Plus,
   Clock,
   Mail,
+  Trash2,
 } from "lucide-react";
 import {
   startOfWeek,
@@ -699,6 +700,22 @@ export default function CalendarPage() {
                     Close
                   </Button>
                 </div>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Delete this event?')) return;
+                    try {
+                      await awsApi.deleteCalendarEvent(user!.id, selectedEvent.id, (selectedEvent as any)._account_id);
+                      setSelectedEvent(null);
+                      fetchEvents();
+                    } catch (e) {
+                      alert('Failed to delete event');
+                    }
+                  }}
+                  className="w-full mt-3 flex items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Event
+                </button>
               </div>
             </div>
           </div>
