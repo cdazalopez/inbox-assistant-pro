@@ -708,7 +708,8 @@ export default function CalendarPage() {
                       setSelectedEvent(null);
                       fetchEvents();
                     } catch (e) {
-                      alert('Failed to delete event');
+                      console.error('Delete failed', e);
+                      alert('Failed to delete event. Please try again.');
                     }
                   }}
                   className="w-full mt-3 flex items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors"
