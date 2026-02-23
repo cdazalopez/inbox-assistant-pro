@@ -280,13 +280,14 @@ function BriefingDetail({ content }: { content: BriefingContent }) {
       {/* Stats bar */}
       {c.stats && (
         <div className="flex flex-wrap gap-3">
-          <StatPill label="New emails" value={c.stats.total_new} />
+          <StatPill label="New emails" value={c.stats.total_new} onClick={() => navigate("/inbox?filter=unread")} />
           <StatPill
             label="Urgent"
             value={c.stats.urgent_count}
             accent={c.stats.urgent_count > 0 ? "text-red-400" : undefined}
+            onClick={() => navigate("/inbox?filter=urgent")}
           />
-          <StatPill label="Need response" value={c.stats.requires_response_count} />
+          <StatPill label="Need response" value={c.stats.requires_response_count} onClick={() => navigate("/inbox?filter=requires_response")} />
         </div>
       )}
 
@@ -389,13 +390,18 @@ function StatPill({
   label,
   value,
   accent,
+  onClick,
 }: {
   label: string;
   value: number;
   accent?: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1">
+    <div
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-1 ${onClick ? "cursor-pointer hover:bg-muted/60 transition-colors" : ""}`}
+    >
       <span className={`text-sm font-semibold ${accent ?? "text-foreground"}`}>
         {value}
       </span>
