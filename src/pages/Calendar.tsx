@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { awsApi } from "@/lib/awsApi";
+import { supabase } from "@/integrations/supabase/client";
 import { CalendarEvent } from "@/components/calendar/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -277,23 +278,64 @@ export default function CalendarPage() {
   };
 
   const handleAiCreate = async () => {
-    if (!aiParsed || !user?.id) return;
+    if (!aiInput.trim() || !user?.id) return;
     setAiLoading(true);
     try {
-      const accountId = selectedAccountIds.has("all") ? accounts[0]?.id : [...selectedAccountIds][0];
-      await awsApi.createCalendarEvent({
-        user_id: user.id,
-        title: aiParsed.title,
-        start_time: aiParsed.start.toISOString(),
-        end_time: aiParsed.end.toISOString(),
-        account_id: accountId,
+      const accountId = selectedAccountIds.has("all")
+        ? accounts[0]?.id
+        : [...selectedAccountIds][0];
+      const accountEmail = accounts.find((a) => a.id === accountId)?.email || "";
+
+      const eventList = (events || []).map((e) => ({
+        id: e.id,
+        title: e.title,
+        start: e.start,
+      }));
+
+      const { data, error } = await supabase.functions.invoke("parse-calendar-command", {
+        body: {
+          user_input: aiInput,
+          events: eventList,
+          account_email: accountEmail,
+          today: new Date().toISOString(),
+        },
       });
-      toast({ title: `✅ "${aiParsed.title}" added` });
-      setAiInput("");
-      setAiParsed(null);
-      fetchEvents();
-    } catch {
-      toast({ title: "Failed to create event", variant: "destructive" });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const parsed = data;
+
+      if (parsed.action === "create") {
+        await awsApi.createCalendarEvent({
+          user_id: user.id,
+          account_id: accountId,
+          title: parsed.title,
+          start_time: parsed.start_time,
+          end_time: parsed.end_time,
+        });
+        toast({ title: `✅ "${parsed.title}" added to calendar` });
+        setAiInput("");
+        setAiParsed(null);
+        fetchEvents();
+      } else if (parsed.action === "delete") {
+        if (!parsed.event_id) {
+          toast({ title: "Couldn't find that event on your calendar", variant: "destructive" });
+          return;
+        }
+        const confirmed = confirm(`Delete "${parsed.title}"?`);
+        if (!confirmed) return;
+        await awsApi.deleteCalendarEvent(user.id, parsed.event_id, accountId);
+        toast({ title: `🗑️ "${parsed.title}" deleted` });
+        setAiInput("");
+        setAiParsed(null);
+        fetchEvents();
+      } else {
+        toast({ title: parsed.message || "Couldn't understand that command", variant: "destructive" });
+      }
+    } catch (e) {
+      console.error("AI calendar error:", e);
+      toast({ title: "AI command failed. Try again.", variant: "destructive" });
     } finally {
       setAiLoading(false);
     }
@@ -393,7 +435,7 @@ export default function CalendarPage() {
                 value={aiInput}
                 onChange={(e) => handleAiInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && aiParsed) handleAiCreate();
+                  if (e.key === "Enter" && aiInput.trim()) handleAiCreate();
                 }}
               />
             </div>
