@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,21 +40,41 @@ export default function CreateEventModal({
   accounts = [],
   defaultAccountId,
 }: CreateEventModalProps) {
-  const defaultDate = initialDate ?? new Date();
-  const defaultHour = initialHour ?? 9;
+  const getDefaults = () => {
+    const defaultDate = initialDate ?? new Date();
+    const defaultHour = initialHour ?? 9;
+    const startDefault = new Date(defaultDate);
+    startDefault.setHours(defaultHour, 0, 0, 0);
+    const endDefault = new Date(startDefault.getTime() + 60 * 60000);
+    return {
+      start: format(startDefault, "yyyy-MM-dd'T'HH:mm"),
+      end: format(endDefault, "yyyy-MM-dd'T'HH:mm"),
+    };
+  };
 
-  const startDefault = new Date(defaultDate);
-  startDefault.setHours(defaultHour, 0, 0, 0);
-  const endDefault = new Date(startDefault.getTime() + 60 * 60000);
+  const defaults = getDefaults();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
-  const [startTime, setStartTime] = useState(format(startDefault, "yyyy-MM-dd'T'HH:mm"));
-  const [endTime, setEndTime] = useState(format(endDefault, "yyyy-MM-dd'T'HH:mm"));
+  const [startTime, setStartTime] = useState(defaults.start);
+  const [endTime, setEndTime] = useState(defaults.end);
   const [allDay, setAllDay] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(defaultAccountId);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const d = getDefaults();
+      setStartTime(d.start);
+      setEndTime(d.end);
+      setTitle("");
+      setDescription("");
+      setLocation("");
+      setAllDay(false);
+      setSelectedAccountId(defaultAccountId);
+    }
+  }, [open, initialDate, initialHour]);
 
   if (!open) return null;
 
