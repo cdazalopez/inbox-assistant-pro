@@ -264,6 +264,14 @@ export const awsApi = {
     return res.json();
   },
 
+  deleteCalendarEvent: async (userId: string, eventId: string, accountId?: string) => {
+    const params = new URLSearchParams({ user_id: userId, event_id: eventId });
+    if (accountId) params.append("account_id", accountId);
+    const res = await fetch(`${API_BASE}/calendar?${params}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete event");
+    return res.json();
+  },
+
   // Templates
   getTemplates: async (userId: string, category?: string) => {
     const params = new URLSearchParams({ user_id: userId });
